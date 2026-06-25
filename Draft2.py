@@ -1,7 +1,6 @@
 import math
 import pandas as pd
 import streamlit as st
-import plotly.express as px
 
 st.set_page_config(
     page_title="NTU Heat Exchanger + Cost Sweep",
@@ -30,12 +29,16 @@ with st.expander("Equations used", expanded=False):
   - \(T_{h,o} = T_{h,i} - Q/C_h\)
   - \(T_{c,o} = T_{c,i} + Q/C_c\)
 
-### Cost model
+### Flow estimation mode
+- If \(Q\) and target \(T_{c,o}\) are known:
+  - \(\dot m_c = Q/[c_{p,c}(T_{c,o}-T_{c,i})]\)
+
+### Cost model from the paper
 - Hot-side conductance: \(\alpha = U_h A_h\)
 - Cold-side conductance: \(\beta = U_c A_c\)
-- Unit conductance cost fit:
+- Cost per unit conductance:
   - \(C(\alpha) = a\alpha^b + c\)
-- Side exchanger cost:
+- Side exchanger costs:
   - \(\text{Cost}_{hot} = \alpha(a_h\alpha^{b_h}+c_h)\)
   - \(\text{Cost}_{cold} = \beta(a_c\beta^{b_c}+c_c)\)
 - Total exchanger cost:
@@ -45,6 +48,7 @@ with st.expander("Equations used", expanded=False):
 - \(A_n = A_0(1.05)^n\), for \(n = 0,1,\dots,9\)
 """)
 
+# Cost coefficients from the attached paper (Table 2)
 COST_DATABASE = {
     "Scenario 1: <100C, water-water / water-aircooled": {
         "hot": {"label": "Plate HX", "a": 517.37, "b": 0.82, "c": 0.03},
@@ -198,11 +202,29 @@ with st.form("ntu_cost_sweep_form"):
         use_ntu_ua_for_beta = st.checkbox("Use β = U×A from NTU area sweep", value=True)
         pmax_kw = st.number_input("Optional electrical power output, P_max (kW)", min_value=0.0, value=0.0, step=10.0)
 
-    manual_alpha = st.number_input("Manual hot-side conductance α (W/K), used only if box above is unchecked", min_value=1.0, value=5000.0, step=100.0)
+    manual_alpha = st.number_input(
+        "Manual hot-side conductance α (W/K), used only if box above is unchecked",
+        min_value=1.0,
+        value=5000.0,
+        step=100.0
+    )
+
     if use_same_conductance:
         manual_beta = manual_alpha
+        st.number_input(
+            "Manual cold-side conductance β (W/K)",
+            min_value=1.0,
+            value=float(manual_beta),
+            step=100.0,
+            disabled=True
+        )
     else:
-        manual_beta = st.number_input("Manual cold-side conductance β (W/K), used only if box above is unchecked", min_value=1.0, value=8000.0, step=100.0)
+        manual_beta = st.number_input(
+            "Manual cold-side conductance β (W/K), used only if box above is unchecked",
+            min_value=1.0,
+            value=8000.0,
+            step=100.0
+        )
 
     submitted = st.form_submit_button("Generate 10 results and plot")
 
@@ -226,12 +248,13 @@ if submitted:
                     )
 
                 alpha_i = thermal["UA"] if use_ntu_ua_for_alpha else manual_alpha
+
                 if use_ntu_ua_for_beta:
                     beta_i = thermal["UA"]
                 else:
-                    beta_i = manual_beta if not use_same_conductance else alpha_i
+                    beta_i = manual_beta
 
-                if use_same_conductance and not use_ntu_ua_for_beta:
+                if use_same_conductance:
                     beta_i = alpha_i
 
                 cost = total_exchanger_cost(alpha_i, beta_i, cost_scenario)
@@ -264,21 +287,12 @@ if submitted:
             df = pd.DataFrame(rows)
 
             st.subheader("10 calculated results")
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, use_container_width=True, hide_index=True)
 
-            fig = px.line(
-                df,
-                x="Area (m²)",
-                y="Total cost ($)",
-                markers=True,
-                title="Area vs Total Heat Exchanger Cost"
-            )
-            fig.update_layout(
-                xaxis_title="Area (m²)",
-                yaxis_title="Total cost ($)",
-                template="plotly_white"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.subheader("Area vs Cost")
+            chart_df = df[["Area (m²)", "Total cost ($)"]].copy()
+            chart_df = chart_df.set_index("Area (m²)")
+            st.line_chart(chart_df)
 
             min_idx = df["Total cost ($)"].idxmin()
             min_row = df.loc[min_idx]
@@ -290,16 +304,19 @@ if submitted:
             m3.metric("Case number", f"{int(min_row['Case'])}")
 
             st.markdown("### Minimum-cost case details")
-            detail_cols = st.columns(4)
-            detail_cols[0].metric("UA (W/K)", f"{min_row['UA (W/K)']:.2f}")
-            detail_cols[1].metric("NTU", f"{min_row['NTU']:.4f}")
-            detail_cols[2].metric("Cold outlet (°C)", f"{min_row['T_cold_out (°C)']:.2f}")
-            detail_cols[3].metric("Hot outlet (°C)", f"{min_row['T_hot_out (°C)']:.2f}")
+            d1, d2, d3, d4 = st.columns(4)
+            d1.metric("UA (W/K)", f"{min_row['UA (W/K)']:.2f}")
+            d2.metric("NTU", f"{min_row['NTU']:.4f}")
+            d3.metric("Cold outlet (°C)", f"{min_row['T_cold_out (°C)']:.2f}")
+            d4.metric("Hot outlet (°C)", f"{min_row['T_hot_out (°C)']:.2f}")
 
             if "Estimated m_dot_c (kg/s)" in df.columns:
-                extra_cols = st.columns(2)
-                extra_cols[0].metric("Estimated m_dot_c (kg/s)", f"{min_row['Estimated m_dot_c (kg/s)']:.4f}")
-                extra_cols[1].metric("Q error (%)", f"{min_row['Q error (%)']:.2f}")
+                e1, e2 = st.columns(2)
+                e1.metric("Estimated m_dot_c (kg/s)", f"{min_row['Estimated m_dot_c (kg/s)']:.4f}")
+                e2.metric("Q error (%)", f"{min_row['Q error (%)']:.2f}")
+
+            if pmax_kw > 0 and "C_hx ($/W)" in df.columns:
+                st.metric("Normalized exchanger cost at minimum, C_hx ($/W)", f"{min_row['C_hx ($/W)']:.4f}")
 
             st.caption(
                 "This sweep uses 10 area values starting from the initial area and increasing each step by 5%."
