@@ -300,9 +300,9 @@ if submitted:
                 use_container_width=True
             )
 
-            st.subheader("Heat Duty and Cost vs Iteration")
-            chart_q_cost = df.set_index("Iteration")[["Q_kW", "HX_Cost_USD"]]
-            st.line_chart(chart_q_cost)
+            st.subheader("Heat Duty and HX Cost vs Area")
+            chart_area_q_cost = df.set_index("Area_m2")[["Q_kW", "HX_Cost_USD"]]
+            st.line_chart(chart_area_q_cost)
 
             st.subheader("Outlet Temperatures vs Iteration")
             chart_temp = df.set_index("Iteration")[["T_h_out_C", "T_c_out_C"]]
