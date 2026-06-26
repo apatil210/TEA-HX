@@ -2,7 +2,7 @@ import math
 import streamlit as st
 
 st.set_page_config(
-    page_title="NTU Heat Exchanger Design + Shell & Tube Cost",
+    page_title="Heat Exchanger Design + Cost",
     page_icon="♨️",
     layout="wide"
 )
