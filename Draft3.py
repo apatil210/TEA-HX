@@ -258,7 +258,7 @@ if submitted:
 
             st.subheader("Iteration table")
             df_display = df[
-                [  
+                [
                     "Area_m2",
                     "T_h_in_C",
                     "T_h_out_C",
@@ -295,7 +295,7 @@ if submitted:
                     "HX Cost ($)": "${:,.2f}",
                 })
             )
-            
+
             st.dataframe(
                 styled_df,
                 use_container_width=True
@@ -336,10 +336,10 @@ if submitted:
             else:
                 st.info("No minimum cost condition reached.")
 
-            st.subheader("Heat Exchanger Cost vs Area")
+            st.subheader("Heat Exchanger Cost vs Heat Duty")
 
             base = alt.Chart(df).encode(
-                x=alt.X("Area_m2:Q", title="Area (m²)"),
+                x=alt.X("Q_kW:Q", title="Heat Duty (kW)"),
                 y=alt.Y("HX_Cost_USD:Q", title="HX Cost ($)")
             )
 
