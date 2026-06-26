@@ -223,13 +223,15 @@ if submitted:
                 rows.append({
                     "Iteration": i + 1,
                     "Area_m2": iter_area,
+                    "T_h_in_C": thi,
+                    "T_h_out_C": result["T_h_out"],
+                    "T_c_in_C": tci,
+                    "T_c_out_C": result["T_c_out"],
                     "U_W_m2K": u,
                     "UA_W_K": result["UA"],
                     "NTU": result["NTU"],
                     "Effectiveness": result["Effectiveness"],
                     "Q_kW": result["Q_kW"],
-                    "T_h_out_C": result["T_h_out"],
-                    "T_c_out_C": result["T_c_out"],
                     "HX_Cost_USD": cost["updated_cost"],
                 })
 
@@ -247,25 +249,35 @@ if submitted:
             r5.metric("Final HX Cost ($)", f"{last['HX_Cost_USD']:,.2f}")
 
             st.subheader("Iteration results table")
-            cols_to_show = [
-                "Iteration",
-                "Area_m2",
-                "Q_kW",
-                "T_h_out_C",
-                "T_c_out_C",
-                "HX_Cost_USD"
+            df_display = df[
+                [
+                    "Area_m2",
+                    "T_h_in_C",
+                    "T_h_out_C",
+                    "T_c_in_C",
+                    "T_c_out_C",
+                    "Q_kW",
+                    "HX_Cost_USD",
                 ]
+            ].rename(columns={
+                "Area_m2": "Area (m²)",
+                "T_h_in_C": "Hot Inlet Temp (°C)",
+                "T_h_out_C": "Hot Outlet Temp (°C)",
+                "T_c_in_C": "Cold Inlet Temp (°C)",
+                "T_c_out_C": "Cold Outlet Temp (°C)",
+                "Q_kW": "Heat Duty (kW)",
+                "HX_Cost_USD": "Updated HX Cost ($)",
+            })
+
             st.dataframe(
-                df.style.format({
-                    "Area_m2": "{:.4f}",
-                    "U_W_m2K": "{:.2f}",
-                    "UA_W_K": "{:.2f}",
-                    "NTU": "{:.4f}",
-                    "Effectiveness": "{:.4f}",
-                    "Q_kW": "{:.4f}",
-                    "T_h_out_C": "{:.2f}",
-                    "T_c_out_C": "{:.2f}",
-                    "HX_Cost_USD": "${:,.2f}",
+                df_display.style.format({
+                    "Area (m²)": "{:.4f}",
+                    "Hot Inlet Temp (°C)": "{:.2f}",
+                    "Hot Outlet Temp (°C)": "{:.2f}",
+                    "Cold Inlet Temp (°C)": "{:.2f}",
+                    "Cold Outlet Temp (°C)": "{:.2f}",
+                    "Heat Duty (kW)": "{:.4f}",
+                    "Updated HX Cost ($)": "${:,.2f}",
                 }),
                 use_container_width=True
             )
@@ -286,7 +298,7 @@ if submitted:
             chart_area = df.set_index("Iteration")[["Area_m2"]]
             st.line_chart(chart_area)
 
-            csv = df.to_csv(index=False).encode("utf-8")
+            csv = df_display.to_csv(index=False).encode("utf-8")
             st.download_button(
                 label="Download results as CSV",
                 data=csv,
