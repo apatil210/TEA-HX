@@ -320,7 +320,7 @@ if submitted:
                         "Cold fluid inlet temperature (°C)",
                         "Cold fluid outlet temperature (°C)",
                         "Heat Exchanger (HX) duty (kW)",
-                        "Total cost ($)"
+                        "Heat Exchanger cost ($)"
                     ],
                     "Value": [
                         f"{best_row['T_h_in_C']:.2f}",
