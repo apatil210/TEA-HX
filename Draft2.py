@@ -301,6 +301,41 @@ if submitted:
                 use_container_width=True
             )
 
+            st.subheader("Minimum Cost Heat Exchanger Configuration")
+
+            valid_mask = (
+                (df["T_h_out_C"] >= min_hot_outlet_temp) &
+                (df["T_c_out_C"] <= max_cold_outlet_temp)
+            )
+
+            valid_rows = df[valid_mask]
+
+            if not valid_rows.empty:
+                best_row = valid_rows.loc[valid_rows["HX_Cost_USD"].idxmin()]
+
+                result_data = pd.DataFrame({
+                    "Parameter": [
+                        "Hot fluid inlet temperature (°C)",
+                        "Hot fluid outlet temperature (°C)",
+                        "Cold fluid inlet temperature (°C)",
+                        "Cold fluid outlet temperature (°C)",
+                        "Heat Exchanger (HX) duty (kW)",
+                        "Total cost ($)"
+                    ],
+                    "Value": [
+                        f"{best_row['T_h_in_C']:.2f}",
+                        f"{best_row['T_h_out_C']:.2f}",
+                        f"{best_row['T_c_in_C']:.2f}",
+                        f"{best_row['T_c_out_C']:.2f}",
+                        f"{best_row['Q_kW']:.4f}",
+                        f"${best_row['HX_Cost_USD']:,.2f}"
+                    ]
+                })
+
+                st.table(result_data)
+            else:
+                st.info("No minimum cost condition reached.")
+
             st.subheader("HX Cost vs Area")
 
             base = alt.Chart(df).encode(
