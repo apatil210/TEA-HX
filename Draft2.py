@@ -226,9 +226,9 @@ if submitted:
             result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
             cost = calculate_shell_tube_cost(area, exchanger_type, pressure_band, material, ci_base, ci_calc)
 
-            st.subheader("Thermal design result")
+            st.subheader("Result")
 
-            r1, r2, r3, r4 = st.columns(4)
+            r1, r2, r3, r4, r5 = st.columns(5)
             # r1.metric("HX Area (m²)", f"{area:.4f}")
             r1.metric("Calculated U (W/m²-K)", f"{u:.2f}")
             # r3.metric("UA (W/K)", f"{result['UA']:.2f}")
@@ -242,13 +242,9 @@ if submitted:
             r8, r9 = st.columns(2)
             r3.metric("Hot Outlet Temp (°C)", f"{result['T_h_out']:.2f}")
             r4.metric("Cold Outlet Temp (°C)", f"{result['T_c_out']:.2f}")
-
-            st.subheader("Shell-and-tube cost result")
-
-            k1 = st.columns(1)
             # k1.metric("Base cost, C_B ($)", f"{cost['base_cost']:,.2f}")
             # k2.metric("Purchased cost, C_E ($)", f"{cost['purchased_cost']:,.2f}")
-            k1.metric("Updated cost ($)", f"{cost['updated_cost']:,.2f}")
+            r5.metric("HX cost ($)", f"{cost['updated_cost']:,.2f}")
 
     except Exception as e:
         st.error(str(e))
