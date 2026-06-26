@@ -1,6 +1,5 @@
 import math
 import pandas as pd
-import plotly.express as px
 import streamlit as st
 
 st.set_page_config(
@@ -248,62 +247,36 @@ if submitted:
             r5.metric("Final HX Cost ($)", f"{last['HX_Cost_USD']:,.2f}")
 
             st.subheader("Iteration results table")
-            display_df = df.copy()
-            display_df["Area_m2"] = display_df["Area_m2"].map(lambda x: f"{x:.4f}")
-            display_df["U_W_m2K"] = display_df["U_W_m2K"].map(lambda x: f"{x:.2f}")
-            display_df["UA_W_K"] = display_df["UA_W_K"].map(lambda x: f"{x:.2f}")
-            display_df["NTU"] = display_df["NTU"].map(lambda x: f"{x:.4f}")
-            display_df["Effectiveness"] = display_df["Effectiveness"].map(lambda x: f"{x:.4f}")
-            display_df["Q_kW"] = display_df["Q_kW"].map(lambda x: f"{x:.4f}")
-            display_df["T_h_out_C"] = display_df["T_h_out_C"].map(lambda x: f"{x:.2f}")
-            display_df["T_c_out_C"] = display_df["T_c_out_C"].map(lambda x: f"{x:.2f}")
-            display_df["HX_Cost_USD"] = display_df["HX_Cost_USD"].map(lambda x: f"${x:,.2f}")
+            st.dataframe(
+                df.style.format({
+                    "Area_m2": "{:.4f}",
+                    "U_W_m2K": "{:.2f}",
+                    "UA_W_K": "{:.2f}",
+                    "NTU": "{:.4f}",
+                    "Effectiveness": "{:.4f}",
+                    "Q_kW": "{:.4f}",
+                    "T_h_out_C": "{:.2f}",
+                    "T_c_out_C": "{:.2f}",
+                    "HX_Cost_USD": "${:,.2f}",
+                }),
+                use_container_width=True
+            )
 
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.subheader("Heat Duty and Cost vs Iteration")
+            chart_q_cost = df.set_index("Iteration")[["Q_kW", "HX_Cost_USD"]]
+            st.line_chart(chart_q_cost)
 
-            st.subheader("Plots")
+            st.subheader("Outlet Temperatures vs Iteration")
+            chart_temp = df.set_index("Iteration")[["T_h_out_C", "T_c_out_C"]]
+            st.line_chart(chart_temp)
 
-            fig_cost_q = px.line(
-                df,
-                x="Area_m2",
-                y=["Q_kW", "HX_Cost_USD"],
-                markers=True,
-                title="Heat Duty and Cost vs Area"
-            )
-            fig_cost_q.update_layout(
-                xaxis_title="Heat Exchanger Area (m²)",
-                yaxis_title="Value",
-                legend_title="Parameter"
-            )
-            st.plotly_chart(fig_cost_q, use_container_width=True)
+            st.subheader("NTU and Effectiveness vs Iteration")
+            chart_ntu_eff = df.set_index("Iteration")[["NTU", "Effectiveness"]]
+            st.line_chart(chart_ntu_eff)
 
-            fig_temp = px.line(
-                df,
-                x="Area_m2",
-                y=["T_h_out_C", "T_c_out_C"],
-                markers=True,
-                title="Outlet Temperatures vs Area"
-            )
-            fig_temp.update_layout(
-                xaxis_title="Heat Exchanger Area (m²)",
-                yaxis_title="Temperature (°C)",
-                legend_title="Parameter"
-            )
-            st.plotly_chart(fig_temp, use_container_width=True)
-
-            fig_ntu_eff = px.line(
-                df,
-                x="Area_m2",
-                y=["NTU", "Effectiveness"],
-                markers=True,
-                title="NTU and Effectiveness vs Area"
-            )
-            fig_ntu_eff.update_layout(
-                xaxis_title="Heat Exchanger Area (m²)",
-                yaxis_title="Value",
-                legend_title="Parameter"
-            )
-            st.plotly_chart(fig_ntu_eff, use_container_width=True)
+            st.subheader("Area progression")
+            chart_area = df.set_index("Iteration")[["Area_m2"]]
+            st.line_chart(chart_area)
 
             csv = df.to_csv(index=False).encode("utf-8")
             st.download_button(
