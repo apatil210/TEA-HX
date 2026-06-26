@@ -20,9 +20,11 @@ def counterflow_effectiveness(ntu: float, cr: float) -> float:
     e = math.exp(-ntu * (1.0 - cr))
     return (1.0 - e) / (1.0 - cr * e)
 
+
 def calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k):
     resistance = (1.0 / h_hot) + (tube_thickness / tube_k) + (1.0 / h_cold)
     return 1.0 / resistance
+
 
 def solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area):
     ua = u * area
@@ -52,9 +54,11 @@ def solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area):
         "T_c_out": tco,
     }
 
+
 def shell_tube_base_cost_si(area_m2):
     lnA = math.log(area_m2)
     return math.exp(8.202 + 0.01506 * lnA + 0.06811 * (lnA ** 2))
+
 
 def exchanger_type_factor(area_m2, exchanger_type):
     lnA = math.log(area_m2)
@@ -69,6 +73,7 @@ def exchanger_type_factor(area_m2, exchanger_type):
     else:
         raise ValueError("Invalid exchanger type selected.")
 
+
 def pressure_factor(area_m2, pressure_band):
     lnA = math.log(area_m2)
     if pressure_band == "Up to 700 kPag (base)":
@@ -81,6 +86,7 @@ def pressure_factor(area_m2, pressure_band):
         return 1.4272 + 0.12088 * lnA
     else:
         raise ValueError("Invalid pressure band selected.")
+
 
 def material_factor(area_m2, material):
     lnA = math.log(area_m2)
@@ -106,6 +112,7 @@ def material_factor(area_m2, material):
         return 3.7614 + 1.51774 * lnA
     else:
         raise ValueError("Invalid material selected.")
+
 
 def calculate_shell_tube_cost(area_m2, exchanger_type, pressure_band, material, ci_base, ci_calc):
     cb = shell_tube_base_cost_si(area_m2)
@@ -140,7 +147,13 @@ with st.form("ntu_single_case_form"):
     t1, t2 = st.columns(2)
 
     with t1:
-        tube_thickness = st.number_input("Tube Thickness, t (m)", min_value=0.000001, value=0.001, step=0.0001, format="%.6f")
+        tube_thickness = st.number_input(
+            "Tube Thickness, t (m)",
+            min_value=0.000001,
+            value=0.001,
+            step=0.0001,
+            format="%.6f"
+        )
 
     with t2:
         tube_k = st.number_input("Tube Therm Cond, k (W/m-K)", min_value=0.0001, value=15.0, step=0.5)
@@ -183,6 +196,7 @@ with st.form("ntu_single_case_form"):
 
     submitted = st.form_submit_button("Calculate 10 Iterations")
 
+
 if submitted:
     try:
         if thi <= tci:
@@ -199,7 +213,12 @@ if submitted:
                 iter_area = area * (1.05 ** i)
                 result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, iter_area)
                 cost = calculate_shell_tube_cost(
-                    iter_area, exchanger_type, pressure_band, material, ci_base, ci_calc
+                    iter_area,
+                    exchanger_type,
+                    pressure_band,
+                    material,
+                    ci_base,
+                    ci_calc
                 )
 
                 rows.append({
@@ -217,65 +236,80 @@ if submitted:
 
             df = pd.DataFrame(rows)
 
-            st.subheader("Summary at final iteration")
+            st.subheader("Result summary")
+            first = df.iloc[0]
             last = df.iloc[-1]
+
             r1, r2, r3, r4, r5 = st.columns(5)
             r1.metric("Calculated U (W/m²-K)", f"{u:.2f}")
-            r2.metric("Final Heat Duty Q (kW)", f"{last['Q_kW']:.4f}")
-            r3.metric("Final Hot Outlet Temp (°C)", f"{last['T_h_out_C']:.2f}")
-            r4.metric("Final Cold Outlet Temp (°C)", f"{last['T_c_out_C']:.2f}")
+            r2.metric("Initial Heat Duty Q (kW)", f"{first['Q_kW']:.4f}")
+            r3.metric("Final Heat Duty Q (kW)", f"{last['Q_kW']:.4f}")
+            r4.metric("Initial HX Cost ($)", f"{first['HX_Cost_USD']:,.2f}")
             r5.metric("Final HX Cost ($)", f"{last['HX_Cost_USD']:,.2f}")
 
             st.subheader("Iteration results table")
-            st.dataframe(
-                df.style.format({
-                    "Area_m2": "{:.4f}",
-                    "U_W_m2K": "{:.2f}",
-                    "UA_W_K": "{:.2f}",
-                    "NTU": "{:.4f}",
-                    "Effectiveness": "{:.4f}",
-                    "Q_kW": "{:.4f}",
-                    "T_h_out_C": "{:.2f}",
-                    "T_c_out_C": "{:.2f}",
-                    "HX_Cost_USD": "${:,.2f}",
-                }),
-                use_container_width=True
-            )
+            display_df = df.copy()
+            display_df["Area_m2"] = display_df["Area_m2"].map(lambda x: f"{x:.4f}")
+            display_df["U_W_m2K"] = display_df["U_W_m2K"].map(lambda x: f"{x:.2f}")
+            display_df["UA_W_K"] = display_df["UA_W_K"].map(lambda x: f"{x:.2f}")
+            display_df["NTU"] = display_df["NTU"].map(lambda x: f"{x:.4f}")
+            display_df["Effectiveness"] = display_df["Effectiveness"].map(lambda x: f"{x:.4f}")
+            display_df["Q_kW"] = display_df["Q_kW"].map(lambda x: f"{x:.4f}")
+            display_df["T_h_out_C"] = display_df["T_h_out_C"].map(lambda x: f"{x:.2f}")
+            display_df["T_c_out_C"] = display_df["T_c_out_C"].map(lambda x: f"{x:.2f}")
+            display_df["HX_Cost_USD"] = display_df["HX_Cost_USD"].map(lambda x: f"${x:,.2f}")
 
-            st.subheader("Performance and cost trends")
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-            fig1 = px.line(
+            st.subheader("Plots")
+
+            fig_cost_q = px.line(
                 df,
                 x="Area_m2",
                 y=["Q_kW", "HX_Cost_USD"],
                 markers=True,
                 title="Heat Duty and Cost vs Area"
             )
-            st.plotly_chart(fig1, use_container_width=True)
+            fig_cost_q.update_layout(
+                xaxis_title="Heat Exchanger Area (m²)",
+                yaxis_title="Value",
+                legend_title="Parameter"
+            )
+            st.plotly_chart(fig_cost_q, use_container_width=True)
 
-            fig2 = px.line(
+            fig_temp = px.line(
                 df,
                 x="Area_m2",
                 y=["T_h_out_C", "T_c_out_C"],
                 markers=True,
                 title="Outlet Temperatures vs Area"
             )
-            st.plotly_chart(fig2, use_container_width=True)
+            fig_temp.update_layout(
+                xaxis_title="Heat Exchanger Area (m²)",
+                yaxis_title="Temperature (°C)",
+                legend_title="Parameter"
+            )
+            st.plotly_chart(fig_temp, use_container_width=True)
 
-            fig3 = px.line(
+            fig_ntu_eff = px.line(
                 df,
                 x="Area_m2",
                 y=["NTU", "Effectiveness"],
                 markers=True,
                 title="NTU and Effectiveness vs Area"
             )
-            st.plotly_chart(fig3, use_container_width=True)
+            fig_ntu_eff.update_layout(
+                xaxis_title="Heat Exchanger Area (m²)",
+                yaxis_title="Value",
+                legend_title="Parameter"
+            )
+            st.plotly_chart(fig_ntu_eff, use_container_width=True)
 
             csv = df.to_csv(index=False).encode("utf-8")
             st.download_button(
-                "Download iteration results as CSV",
+                label="Download results as CSV",
                 data=csv,
-                file_name="hx_iteration_results.csv",
+                file_name="heat_exchanger_iteration_results.csv",
                 mime="text/csv"
             )
 
