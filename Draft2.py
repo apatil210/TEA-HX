@@ -256,7 +256,7 @@ if submitted:
 
             df = pd.DataFrame(rows)
 
-            st.subheader("Results table")
+            st.subheader("Iteration table")
             df_display = df[
                 [
                     "Area_m2",
