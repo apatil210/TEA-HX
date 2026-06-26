@@ -255,7 +255,7 @@ if submitted:
                 "T_c_in_C": "Cold Inlet Temp (°C)",
                 "T_c_out_C": "Cold Outlet Temp (°C)",
                 "Q_kW": "Heat Duty (kW)",
-                "HX_Cost_USD": "Updated HX Cost ($)",
+                "HX_Cost_USD": "HX Cost ($)",
             })
 
             st.dataframe(
