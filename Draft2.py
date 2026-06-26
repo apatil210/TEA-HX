@@ -1,5 +1,4 @@
 import math
-import pandas as pd
 import streamlit as st
 
 st.set_page_config(
@@ -9,10 +8,7 @@ st.set_page_config(
 )
 
 st.title("NTU Heat Exchanger Design")
-st.write(
-    "Calculate outlet temperatures using the NTU / effectiveness method "
-    "with a 10-point sweep based on heat exchanger area."
-)
+st.write("Calculate one heat exchanger case using the NTU / effectiveness method.") 
 
 with st.expander("Equations used", expanded=False):
     st.markdown(r"""
@@ -28,8 +24,6 @@ with st.expander("Equations used", expanded=False):
 - Outlet temperatures:
   - \(T_{h,o} = T_{h,i} - Q/C_h\)
   - \(T_{c,o} = T_{c,i} + Q/C_c\)
-- Area sweep:
-  - \(A_n = A_0(1.05)^n\), for \(n = 0,1,\dots,9\)
 """)
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
@@ -53,9 +47,8 @@ def solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area):
     q = eps * qmax
     tho = thi - q / ch
     tco = tci + q / cc
+
     return {
-        "U": u,
-        "A": area,
         "UA": ua,
         "C_h": ch,
         "C_c": cc,
@@ -63,13 +56,13 @@ def solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area):
         "C_max": cmax,
         "C_r": cr,
         "NTU": ntu,
-        "epsilon": eps,
-        "Q": q,
+        "Effectiveness": eps,
+        "Q_kW": q / 1000.0,
         "T_h_out": tho,
         "T_c_out": tco,
     }
 
-with st.form("ntu_design_form"):
+with st.form("ntu_single_case_form"):
     st.markdown("## Input values")
     col1, col2 = st.columns(2)
 
@@ -79,8 +72,8 @@ with st.form("ntu_design_form"):
         mh = st.number_input("Mass Flow of Hot Fluid (kg/s)", min_value=0.0001, value=1.2, step=0.1, format="%.4f")
 
     with col2:
-        area = st.number_input("Starting value of HX area (m²)", min_value=0.0001, value=10.0, step=0.1)
-        mc = st.number_input("Starting value of Mass Flow of Cold Fluid (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
+        area = st.number_input("Value of HX area (m²)", min_value=0.0001, value=10.0, step=0.1)
+        mc = st.number_input("Mass Flow of Cold Fluid (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
         u = st.number_input("Overall Heat Transfer Coefficient, U (W/m²-K)", min_value=0.0001, value=500.0, step=10.0)
 
     st.markdown("## Fluid properties")
@@ -92,7 +85,7 @@ with st.form("ntu_design_form"):
     with p2:
         cpc = st.number_input("Cold Fluid Specific Heat, c_p,c (Water) (J/kg-K)", min_value=1.0, value=4180.0, step=10.0)
 
-    submitted = st.form_submit_button("Generate 10 design results")
+    submitted = st.form_submit_button("Calculate")
 
 if submitted:
     try:
@@ -101,50 +94,38 @@ if submitted:
         elif u <= 0 or area <= 0:
             st.error("U and heat exchanger area must both be greater than zero.")
         else:
-            rows = []
+            result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
 
-            for i in range(10):
-                area_i = area * (1.05 ** i)
-                thermal = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area_i)
+            st.subheader("Calculated result")
 
-                row = {
-                    "Case": i + 1,
-                    "HX Area (m²)": area_i,
-                    "UA (W/K)": thermal["UA"],
-                    "C_h (W/K)": thermal["C_h"],
-                    "C_c (W/K)": thermal["C_c"],
-                    "C_min (W/K)": thermal["C_min"],
-                    "C_max (W/K)": thermal["C_max"],
-                    "C_r": thermal["C_r"],
-                    "NTU": thermal["NTU"],
-                    "Effectiveness": thermal["epsilon"],
-                    "Heat Duty Q (kW)": thermal["Q"] / 1000.0,
-                    "Hot Outlet Temp (°C)": thermal["T_h_out"],
-                    "Cold Outlet Temp (°C)": thermal["T_c_out"],
-                }
-                rows.append(row)
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("HX Area (m²)", f"{area:.4f}")
+            r2.metric("UA (W/K)", f"{result['UA']:.2f}")
+            r3.metric("NTU", f"{result['NTU']:.4f}")
+            r4.metric("Effectiveness", f"{result['Effectiveness']:.4f}")
 
-            df = pd.DataFrame(rows)
+            r5, r6, r7 = st.columns(3)
+            r5.metric("Heat Duty Q (kW)", f"{result['Q_kW']:.4f}")
+            r6.metric("Hot Outlet Temp (°C)", f"{result['T_h_out']:.2f}")
+            r7.metric("Cold Outlet Temp (°C)", f"{result['T_c_out']:.2f}")
 
-            st.subheader("10 calculated design results")
-            st.dataframe(df, use_container_width=True, hide_index=True)
-
-            st.subheader("Summary for final sweep point")
-            final_row = df.iloc[-1]
-
-            s1, s2, s3, s4 = st.columns(4)
-            s1.metric("Final HX Area (m²)", f"{final_row['HX Area (m²)']:.4f}")
-            s2.metric("Final UA (W/K)", f"{final_row['UA (W/K)']:.2f}")
-            s3.metric("Final NTU", f"{final_row['NTU']:.4f}")
-            s4.metric("Final Effectiveness", f"{final_row['Effectiveness']:.4f}")
-
-            o1, o2 = st.columns(2)
-            o1.metric("Hot Outlet Temp (°C)", f"{final_row['Hot Outlet Temp (°C)']:.2f}")
-            o2.metric("Cold Outlet Temp (°C)", f"{final_row['Cold Outlet Temp (°C)']:.2f}")
-
-            st.caption(
-                "This sweep uses 10 area values starting from the initial HX area and increasing each step by 5%."
-            )
+            st.markdown("## Detailed results")
+            st.table({
+                "Parameter": [
+                    "C_h (W/K)",
+                    "C_c (W/K)",
+                    "C_min (W/K)",
+                    "C_max (W/K)",
+                    "C_r",
+                ],
+                "Value": [
+                    f"{result['C_h']:.2f}",
+                    f"{result['C_c']:.2f}",
+                    f"{result['C_min']:.2f}",
+                    f"{result['C_max']:.2f}",
+                    f"{result['C_r']:.4f}",
+                ]
+            })
 
     except Exception as e:
         st.error(str(e))
