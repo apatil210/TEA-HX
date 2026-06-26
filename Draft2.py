@@ -228,7 +228,7 @@ if submitted:
 
             rows = []
             for i in range(10):
-                iter_area = area * (1.5 ** i)
+                iter_area = area * (1.2 ** i)
                 result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, iter_area)
                 cost = calculate_shell_tube_cost(
                     iter_area,
