@@ -237,18 +237,7 @@ if submitted:
 
             df = pd.DataFrame(rows)
 
-            st.subheader("Result summary")
-            first = df.iloc[0]
-            last = df.iloc[-1]
-
-            r1, r2, r3, r4, r5 = st.columns(5)
-            r1.metric("Calculated U (W/m²-K)", f"{u:.2f}")
-            r2.metric("Initial Heat Duty Q (kW)", f"{first['Q_kW']:.4f}")
-            r3.metric("Final Heat Duty Q (kW)", f"{last['Q_kW']:.4f}")
-            r4.metric("Initial HX Cost ($)", f"{first['HX_Cost_USD']:,.2f}")
-            r5.metric("Final HX Cost ($)", f"{last['HX_Cost_USD']:,.2f}")
-
-            st.subheader("Iteration results table")
+            st.subheader("Results table")
             df_display = df[
                 [
                     "Area_m2",
