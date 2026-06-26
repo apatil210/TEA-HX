@@ -257,7 +257,7 @@ if submitted:
                 "Q_kW": "Heat Duty (kW)",
                 "HX_Cost_USD": "HX Cost ($)",
             })
-
+            df_display.index = df_display.index + 1
             st.dataframe(
                 df_display.style.format({
                     "Area (m²)": "{:.4f}",
