@@ -247,6 +247,14 @@ if submitted:
             r5.metric("Final HX Cost ($)", f"{last['HX_Cost_USD']:,.2f}")
 
             st.subheader("Iteration results table")
+            cols_to_show = [
+                "Iteration",
+                "Area_m2",
+                "Q_kW",
+                "T_h_out_C",
+                "T_c_out_C",
+                "HX_Cost_USD"
+                ]
             st.dataframe(
                 df.style.format({
                     "Area_m2": "{:.4f}",
