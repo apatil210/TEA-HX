@@ -295,7 +295,7 @@ if submitted:
                     "HX Cost ($)": "${:,.2f}",
                 })
             )
-            df_display.index = range(1, len(df_display) + 1)
+            
             st.dataframe(
                 styled_df,
                 use_container_width=True
