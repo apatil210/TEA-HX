@@ -13,34 +13,97 @@ st.write("Calculate one heat exchanger case using the NTU / effectiveness method
 with st.expander("Equations used", expanded=False):
     st.markdown(r"""
 ### Overall heat transfer coefficient
-- \( \frac{1}{U} = \frac{1}{h_h} + \frac{t}{k} + \frac{1}{h_c} \)
+
+\[
+\frac{1}{U} = \frac{1}{h_h} + \frac{t}{k} + \frac{1}{h_c}
+\]
 
 Where:
-- \(h_h\) = hot fluid heat transfer coefficient
-- \(h_c\) = cold fluid heat transfer coefficient
-- \(t\) = tube thickness
-- \(k\) = tube thermal conductivity
+
+- \( h_h \) = hot fluid heat transfer coefficient
+- \( h_c \) = cold fluid heat transfer coefficient
+- \( t \) = tube thickness
+- \( k \) = tube thermal conductivity
 
 ### NTU / Effectiveness model
-- Heat capacity rates: \(C_h = \dot m_h c_{p,h}\), \(C_c = \dot m_c c_{p,c}\)
-- Total conductance: \(UA = U \times A\)
-- Capacity ratio: \(C_r = C_{min}/C_{max}\)
-- NTU: \(NTU = UA/C_{min}\)
-- Counter-flow effectiveness:
-  - for \(C_r \neq 1\): \(\varepsilon = \frac{1-e^{-NTU(1-C_r)}}{1-C_r e^{-NTU(1-C_r)}}\)
-  - for \(C_r = 1\): \(\varepsilon = \frac{NTU}{1+NTU}\)
-- Heat transfer: \(Q = \varepsilon C_{min}(T_{h,i}-T_{c,i})\)
-- Outlet temperatures:
-  - \(T_{h,o} = T_{h,i} - Q/C_h\)
-  - \(T_{c,o} = T_{c,i} + Q/C_c\)
+
+Heat capacity rates:
+
+\[
+C_h = \dot{m}_h \, c_{p,h}
+\]
+
+\[
+C_c = \dot{m}_c \, c_{p,c}
+\]
+
+Total conductance:
+
+\[
+UA = U \times A
+\]
+
+Capacity ratio:
+
+\[
+C_r = \frac{C_{\min}}{C_{\max}}
+\]
+
+NTU:
+
+\[
+NTU = \frac{UA}{C_{\min}}
+\]
+
+Counter-flow effectiveness:
+
+For \( C_r \neq 1 \):
+
+\[
+\varepsilon = \frac{1 - e^{-NTU(1 - C_r)}}{1 - C_r e^{-NTU(1 - C_r)}}
+\]
+
+For \( C_r = 1 \):
+
+\[
+\varepsilon = \frac{NTU}{1 + NTU}
+\]
+
+Heat transfer:
+
+\[
+Q = \varepsilon C_{\min}(T_{h,i} - T_{c,i})
+\]
+
+Outlet temperatures:
+
+\[
+T_{h,o} = T_{h,i} - \frac{Q}{C_h}
+\]
+
+\[
+T_{c,o} = T_{c,i} + \frac{Q}{C_c}
+\]
 
 ### Shell-and-tube cost model
-- Base cost in SI units:
-  - \(C_B = \exp(8.202 + 0.01506\ln A + 0.06811(\ln A)^2)\)
-- Purchased exchanger cost:
-  - \(C_E = C_B \times F_D \times F_P \times F_M\)
-- Updated cost:
-  - \(C_{E,\text{updated}} = \left(\frac{CI_{\text{calc}}}{CI_{\text{base}}}\right) \times C_E\)
+
+Base cost in SI units:
+
+\[
+C_B = \exp\left(8.202 + 0.01506 \ln A + 0.06811 (\ln A)^2\right)
+\]
+
+Purchased exchanger cost:
+
+\[
+C_E = C_B \times F_D \times F_P \times F_M
+\]
+
+Updated cost:
+
+\[
+C_{E,\text{updated}} = \left(\frac{CI_{\text{calc}}}{CI_{\text{base}}}\right) \times C_E
+\]
 """)
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
@@ -229,21 +292,10 @@ if submitted:
             st.subheader("Result")
 
             r1, r2, r3, r4, r5 = st.columns(5)
-            # r1.metric("HX Area (m²)", f"{area:.4f}")
             r1.metric("Calculated U (W/m²-K)", f"{u:.2f}")
-            # r3.metric("UA (W/K)", f"{result['UA']:.2f}")
-            # r4.metric("NTU", f"{result['NTU']:.4f}")
-
-            
-            # r5.metric("Effectiveness", f"{result['Effectiveness']:.4f}")
             r2.metric("Heat Duty Q (kW)", f"{result['Q_kW']:.4f}")
-            # r7.metric("Capacity Ratio C_r", f"{result['C_r']:.4f}")
-
-            r8, r9 = st.columns(2)
             r3.metric("Hot Outlet Temp (°C)", f"{result['T_h_out']:.2f}")
             r4.metric("Cold Outlet Temp (°C)", f"{result['T_c_out']:.2f}")
-            # k1.metric("Base cost, C_B ($)", f"{cost['base_cost']:,.2f}")
-            # k2.metric("Purchased cost, C_E ($)", f"{cost['purchased_cost']:,.2f}")
             r5.metric("HX cost ($)", f"{cost['updated_cost']:,.2f}")
 
     except Exception as e:
