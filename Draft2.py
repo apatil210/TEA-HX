@@ -1,4 +1,6 @@
 import math
+import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 st.set_page_config(
@@ -118,6 +120,7 @@ def calculate_shell_tube_cost(area_m2, exchanger_type, pressure_band, material, 
         "updated_cost": updated_cost,
     }
 
+
 with st.form("ntu_single_case_form"):
     st.markdown("## Input values")
     col1, col2 = st.columns(2)
@@ -178,7 +181,7 @@ with st.form("ntu_single_case_form"):
     with c3:
         ci_calc = st.number_input("Calculation-year cost index", min_value=0.0001, value=800.0, step=1.0)
 
-    submitted = st.form_submit_button("Calculate")
+    submitted = st.form_submit_button("Calculate 10 Iterations")
 
 if submitted:
     try:
@@ -190,17 +193,91 @@ if submitted:
             st.error("Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero.")
         else:
             u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
-            result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
-            cost = calculate_shell_tube_cost(area, exchanger_type, pressure_band, material, ci_base, ci_calc)
 
-            st.subheader("Result")
+            rows = []
+            for i in range(10):
+                iter_area = area * (1.05 ** i)
+                result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, iter_area)
+                cost = calculate_shell_tube_cost(
+                    iter_area, exchanger_type, pressure_band, material, ci_base, ci_calc
+                )
 
+                rows.append({
+                    "Iteration": i + 1,
+                    "Area_m2": iter_area,
+                    "U_W_m2K": u,
+                    "UA_W_K": result["UA"],
+                    "NTU": result["NTU"],
+                    "Effectiveness": result["Effectiveness"],
+                    "Q_kW": result["Q_kW"],
+                    "T_h_out_C": result["T_h_out"],
+                    "T_c_out_C": result["T_c_out"],
+                    "HX_Cost_USD": cost["updated_cost"],
+                })
+
+            df = pd.DataFrame(rows)
+
+            st.subheader("Summary at final iteration")
+            last = df.iloc[-1]
             r1, r2, r3, r4, r5 = st.columns(5)
             r1.metric("Calculated U (W/m²-K)", f"{u:.2f}")
-            r2.metric("Heat Duty Q (kW)", f"{result['Q_kW']:.4f}")
-            r3.metric("Hot Outlet Temp (°C)", f"{result['T_h_out']:.2f}")
-            r4.metric("Cold Outlet Temp (°C)", f"{result['T_c_out']:.2f}")
-            r5.metric("HX cost ($)", f"{cost['updated_cost']:,.2f}")
+            r2.metric("Final Heat Duty Q (kW)", f"{last['Q_kW']:.4f}")
+            r3.metric("Final Hot Outlet Temp (°C)", f"{last['T_h_out_C']:.2f}")
+            r4.metric("Final Cold Outlet Temp (°C)", f"{last['T_c_out_C']:.2f}")
+            r5.metric("Final HX Cost ($)", f"{last['HX_Cost_USD']:,.2f}")
+
+            st.subheader("Iteration results table")
+            st.dataframe(
+                df.style.format({
+                    "Area_m2": "{:.4f}",
+                    "U_W_m2K": "{:.2f}",
+                    "UA_W_K": "{:.2f}",
+                    "NTU": "{:.4f}",
+                    "Effectiveness": "{:.4f}",
+                    "Q_kW": "{:.4f}",
+                    "T_h_out_C": "{:.2f}",
+                    "T_c_out_C": "{:.2f}",
+                    "HX_Cost_USD": "${:,.2f}",
+                }),
+                use_container_width=True
+            )
+
+            st.subheader("Performance and cost trends")
+
+            fig1 = px.line(
+                df,
+                x="Area_m2",
+                y=["Q_kW", "HX_Cost_USD"],
+                markers=True,
+                title="Heat Duty and Cost vs Area"
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+
+            fig2 = px.line(
+                df,
+                x="Area_m2",
+                y=["T_h_out_C", "T_c_out_C"],
+                markers=True,
+                title="Outlet Temperatures vs Area"
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+
+            fig3 = px.line(
+                df,
+                x="Area_m2",
+                y=["NTU", "Effectiveness"],
+                markers=True,
+                title="NTU and Effectiveness vs Area"
+            )
+            st.plotly_chart(fig3, use_container_width=True)
+
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Download iteration results as CSV",
+                data=csv,
+                file_name="hx_iteration_results.csv",
+                mime="text/csv"
+            )
 
     except Exception as e:
         st.error(str(e))
