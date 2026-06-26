@@ -304,18 +304,6 @@ if submitted:
             chart_area_q_cost = df.set_index("Area_m2")[["Q_kW", "HX_Cost_USD"]]
             st.line_chart(chart_area_q_cost)
 
-            st.subheader("Outlet Temperatures vs Iteration")
-            chart_temp = df.set_index("Iteration")[["T_h_out_C", "T_c_out_C"]]
-            st.line_chart(chart_temp)
-
-            st.subheader("NTU and Effectiveness vs Iteration")
-            chart_ntu_eff = df.set_index("Iteration")[["NTU", "Effectiveness"]]
-            st.line_chart(chart_ntu_eff)
-
-            st.subheader("Area progression")
-            chart_area = df.set_index("Iteration")[["Area_m2"]]
-            st.line_chart(chart_area)
-
             csv = df_display.to_csv(index=False).encode("utf-8")
             st.download_button(
                 label="Download results as CSV",
