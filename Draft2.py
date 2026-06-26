@@ -245,10 +245,10 @@ if submitted:
 
             st.subheader("Shell-and-tube cost result")
 
-            k1, k2, k3 = st.columns(3)
+            k1 = st.columns(1)
             # k1.metric("Base cost, C_B ($)", f"{cost['base_cost']:,.2f}")
             # k2.metric("Purchased cost, C_E ($)", f"{cost['purchased_cost']:,.2f}")
-            k3.metric("Updated cost ($)", f"{cost['updated_cost']:,.2f}")
+            k1.metric("Updated cost ($)", f"{cost['updated_cost']:,.2f}")
 
     except Exception as e:
         st.error(str(e))
