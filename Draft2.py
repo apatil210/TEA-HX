@@ -8,7 +8,7 @@ st.set_page_config(
 )
 
 st.title("NTU Heat Exchanger Design")
-st.write("Calculate one heat exchanger case using the NTU / effectiveness method.") 
+st.write("Calculate one heat exchanger case using the NTU / effectiveness method.")
 
 with st.expander("Equations used", expanded=False):
     st.markdown(r"""
@@ -18,8 +18,8 @@ with st.expander("Equations used", expanded=False):
 Where:
 - \(h_h\) = hot fluid heat transfer coefficient
 - \(h_c\) = cold fluid heat transfer coefficient
-- \(t\) = wall thickness
-- \(k\) = wall thermal conductivity
+- \(t\) = tube thickness
+- \(k\) = tube thermal conductivity
 
 ### NTU / Effectiveness model
 - Heat capacity rates: \(C_h = \dot m_h c_{p,h}\), \(C_c = \dot m_c c_{p,c}\)
@@ -43,8 +43,8 @@ def counterflow_effectiveness(ntu: float, cr: float) -> float:
     e = math.exp(-ntu * (1.0 - cr))
     return (1.0 - e) / (1.0 - cr * e)
 
-def calculate_overall_u(h_hot, h_cold, wall_thickness, wall_k):
-    resistance = (1.0 / h_hot) + (wall_thickness / wall_k) + (1.0 / h_cold)
+def calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k):
+    resistance = (1.0 / h_hot) + (tube_thickness / tube_k) + (1.0 / h_cold)
     return 1.0 / resistance
 
 def solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area):
@@ -90,14 +90,14 @@ with st.form("ntu_single_case_form"):
         h_hot = st.number_input("HT Coeff of Hot Fluid, h_hot (W/m²-K)", min_value=0.0001, value=1000.0, step=10.0)
         h_cold = st.number_input("HT Coeff of Cold Fluid, h_cold (W/m²-K)", min_value=0.0001, value=1500.0, step=10.0)
 
-    st.markdown("## Wall properties for U calculation")
-    w1, w2 = st.columns(2)
+    st.markdown("## Tube properties")
+    t1, t2 = st.columns(2)
 
-    with w1:
-        wall_thickness = st.number_input("Wall thickness, t (m)", min_value=0.000001, value=0.001, step=0.0001, format="%.6f")
+    with t1:
+        tube_thickness = st.number_input("Tube Thickness, t (m)", min_value=0.000001, value=0.001, step=0.0001, format="%.6f")
 
-    with w2:
-        wall_k = st.number_input("Wall thermal conductivity, k (W/m-K)", min_value=0.0001, value=15.0, step=0.5)
+    with t2:
+        tube_k = st.number_input("Tube Therm Cond, k (W/m-K)", min_value=0.0001, value=15.0, step=0.5)
 
     st.markdown("## Fluid properties")
     p1, p2 = st.columns(2)
@@ -116,10 +116,10 @@ if submitted:
             st.error("Hot inlet temperature must be greater than cold inlet temperature.")
         elif area <= 0:
             st.error("Heat exchanger area must be greater than zero.")
-        elif h_hot <= 0 or h_cold <= 0 or wall_thickness <= 0 or wall_k <= 0:
-            st.error("Heat transfer coefficients, wall thickness, and wall conductivity must be greater than zero.")
+        elif h_hot <= 0 or h_cold <= 0 or tube_thickness <= 0 or tube_k <= 0:
+            st.error("Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero.")
         else:
-            u = calculate_overall_u(h_hot, h_cold, wall_thickness, wall_k)
+            u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
             result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
 
             st.subheader("Calculated result")
@@ -142,10 +142,11 @@ if submitted:
             st.markdown("## Detailed results")
             st.table({
                 "Parameter": [
-                    "Hot-side HT coefficient, h_hot (W/m²-K)",
-                    "Cold-side HT coefficient, h_cold (W/m²-K)",
-                    "Wall thickness, t (m)",
-                    "Wall conductivity, k (W/m-K)",
+                    "HT Coeff of Hot Fluid (W/m²-K)",
+                    "HT Coeff of Cold Fluid (W/m²-K)",
+                    "Tube Thickness (m)",
+                    "Tube Therm Cond (W/m-K)",
+                    "Calculated U (W/m²-K)",
                     "C_h (W/K)",
                     "C_c (W/K)",
                     "C_min (W/K)",
@@ -154,8 +155,9 @@ if submitted:
                 "Value": [
                     f"{h_hot:.2f}",
                     f"{h_cold:.2f}",
-                    f"{wall_thickness:.6f}",
-                    f"{wall_k:.2f}",
+                    f"{tube_thickness:.6f}",
+                    f"{tube_k:.2f}",
+                    f"{u:.2f}",
                     f"{result['C_h']:.2f}",
                     f"{result['C_c']:.2f}",
                     f"{result['C_min']:.2f}",
