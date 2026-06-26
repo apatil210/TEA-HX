@@ -1,6 +1,7 @@
 import math
 import pandas as pd
 import streamlit as st
+import plotly.express as px
 
 st.set_page_config(
     page_title="Heat Exchanger Design + Cost",
@@ -300,9 +301,26 @@ if submitted:
                 use_container_width=True
             )
 
-            st.subheader("Heat Duty and HX Cost vs Area")
-            chart_area_q_cost = df.set_index("Area_m2")[["Q_kW", "HX_Cost_USD"]]
-            st.line_chart(chart_area_q_cost)
+            st.subheader("HX Cost vs Area")
+
+            fig = px.scatter(
+                df,
+                x="Area_m2",
+                y="HX_Cost_USD",
+                labels={
+                    "Area_m2": "Area (m²)",
+                    "HX_Cost_USD": "HX Cost ($)"
+                }
+            )
+
+            fig.update_traces(mode="lines+markers")
+            fig.update_layout(
+                xaxis_title="Area (m²)",
+                yaxis_title="HX Cost ($)"
+            )
+            fig.update_yaxes(tickprefix="$")
+
+            st.plotly_chart(fig, use_container_width=True)
 
             csv = df_display.to_csv(index=False).encode("utf-8")
             st.download_button(
