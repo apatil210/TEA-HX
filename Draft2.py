@@ -12,6 +12,15 @@ st.write("Calculate one heat exchanger case using the NTU / effectiveness method
 
 with st.expander("Equations used", expanded=False):
     st.markdown(r"""
+### Overall heat transfer coefficient
+- \( \frac{1}{U} = \frac{1}{h_h} + \frac{t}{k} + \frac{1}{h_c} \)
+
+Where:
+- \(h_h\) = hot fluid heat transfer coefficient
+- \(h_c\) = cold fluid heat transfer coefficient
+- \(t\) = wall thickness
+- \(k\) = wall thermal conductivity
+
 ### NTU / Effectiveness model
 - Heat capacity rates: \(C_h = \dot m_h c_{p,h}\), \(C_c = \dot m_c c_{p,c}\)
 - Total conductance: \(UA = U \times A\)
@@ -33,6 +42,10 @@ def counterflow_effectiveness(ntu: float, cr: float) -> float:
         return ntu / (1.0 + ntu)
     e = math.exp(-ntu * (1.0 - cr))
     return (1.0 - e) / (1.0 - cr * e)
+
+def calculate_overall_u(h_hot, h_cold, wall_thickness, wall_k):
+    resistance = (1.0 / h_hot) + (wall_thickness / wall_k) + (1.0 / h_cold)
+    return 1.0 / resistance
 
 def solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area):
     ua = u * area
@@ -70,11 +83,21 @@ with st.form("ntu_single_case_form"):
         thi = st.number_input("Hot Fluid Inlet Temperature (°C)", value=120.0)
         tci = st.number_input("Initial Cold Fluid Temp (avg T of return water) (°C)", value=25.0)
         mh = st.number_input("Mass Flow of Hot Fluid (kg/s)", min_value=0.0001, value=1.2, step=0.1, format="%.4f")
+        mc = st.number_input("Mass Flow of Cold Fluid (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
 
     with col2:
         area = st.number_input("Value of HX area (m²)", min_value=0.0001, value=10.0, step=0.1)
-        mc = st.number_input("Mass Flow of Cold Fluid (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
-        u = st.number_input("Overall Heat Transfer Coefficient, U (W/m²-K)", min_value=0.0001, value=500.0, step=10.0)
+        h_hot = st.number_input("HT Coeff of Hot Fluid, h_hot (W/m²-K)", min_value=0.0001, value=1000.0, step=10.0)
+        h_cold = st.number_input("HT Coeff of Cold Fluid, h_cold (W/m²-K)", min_value=0.0001, value=1500.0, step=10.0)
+
+    st.markdown("## Wall properties for U calculation")
+    w1, w2 = st.columns(2)
+
+    with w1:
+        wall_thickness = st.number_input("Wall thickness, t (m)", min_value=0.000001, value=0.001, step=0.0001, format="%.6f")
+
+    with w2:
+        wall_k = st.number_input("Wall thermal conductivity, k (W/m-K)", min_value=0.0001, value=15.0, step=0.5)
 
     st.markdown("## Fluid properties")
     p1, p2 = st.columns(2)
@@ -91,39 +114,52 @@ if submitted:
     try:
         if thi <= tci:
             st.error("Hot inlet temperature must be greater than cold inlet temperature.")
-        elif u <= 0 or area <= 0:
-            st.error("U and heat exchanger area must both be greater than zero.")
+        elif area <= 0:
+            st.error("Heat exchanger area must be greater than zero.")
+        elif h_hot <= 0 or h_cold <= 0 or wall_thickness <= 0 or wall_k <= 0:
+            st.error("Heat transfer coefficients, wall thickness, and wall conductivity must be greater than zero.")
         else:
+            u = calculate_overall_u(h_hot, h_cold, wall_thickness, wall_k)
             result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
 
             st.subheader("Calculated result")
 
             r1, r2, r3, r4 = st.columns(4)
             r1.metric("HX Area (m²)", f"{area:.4f}")
-            r2.metric("UA (W/K)", f"{result['UA']:.2f}")
-            r3.metric("NTU", f"{result['NTU']:.4f}")
-            r4.metric("Effectiveness", f"{result['Effectiveness']:.4f}")
+            r2.metric("Calculated U (W/m²-K)", f"{u:.2f}")
+            r3.metric("UA (W/K)", f"{result['UA']:.2f}")
+            r4.metric("NTU", f"{result['NTU']:.4f}")
 
             r5, r6, r7 = st.columns(3)
-            r5.metric("Heat Duty Q (kW)", f"{result['Q_kW']:.4f}")
-            r6.metric("Hot Outlet Temp (°C)", f"{result['T_h_out']:.2f}")
-            r7.metric("Cold Outlet Temp (°C)", f"{result['T_c_out']:.2f}")
+            r5.metric("Effectiveness", f"{result['Effectiveness']:.4f}")
+            r6.metric("Heat Duty Q (kW)", f"{result['Q_kW']:.4f}")
+            r7.metric("Capacity Ratio C_r", f"{result['C_r']:.4f}")
+
+            r8, r9 = st.columns(2)
+            r8.metric("Hot Outlet Temp (°C)", f"{result['T_h_out']:.2f}")
+            r9.metric("Cold Outlet Temp (°C)", f"{result['T_c_out']:.2f}")
 
             st.markdown("## Detailed results")
             st.table({
                 "Parameter": [
+                    "Hot-side HT coefficient, h_hot (W/m²-K)",
+                    "Cold-side HT coefficient, h_cold (W/m²-K)",
+                    "Wall thickness, t (m)",
+                    "Wall conductivity, k (W/m-K)",
                     "C_h (W/K)",
                     "C_c (W/K)",
                     "C_min (W/K)",
-                    "C_max (W/K)",
-                    "C_r",
+                    "C_max (W/K)"
                 ],
                 "Value": [
+                    f"{h_hot:.2f}",
+                    f"{h_cold:.2f}",
+                    f"{wall_thickness:.6f}",
+                    f"{wall_k:.2f}",
                     f"{result['C_h']:.2f}",
                     f"{result['C_c']:.2f}",
                     f"{result['C_min']:.2f}",
-                    f"{result['C_max']:.2f}",
-                    f"{result['C_r']:.4f}",
+                    f"{result['C_max']:.2f}"
                 ]
             })
 
