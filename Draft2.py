@@ -258,7 +258,7 @@ if submitted:
 
             st.subheader("Iteration table")
             df_display = df[
-                [   "Iteration",
+                [  
                     "Area_m2",
                     "T_h_in_C",
                     "T_h_out_C",
