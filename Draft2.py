@@ -10,8 +10,8 @@ st.set_page_config(
 
 st.title("NTU Heat Exchanger Design")
 st.write(
-    "Calculate outlet temperatures and perform a 10-point area sweep with "
-    "5% area increments using the NTU / effectiveness method."
+    "Calculate outlet temperatures using the NTU / effectiveness method "
+    "with a 10-point sweep based on heat exchanger area."
 )
 
 with st.expander("Equations used", expanded=False):
@@ -28,13 +28,8 @@ with st.expander("Equations used", expanded=False):
 - Outlet temperatures:
   - \(T_{h,o} = T_{h,i} - Q/C_h\)
   - \(T_{c,o} = T_{c,i} + Q/C_c\)
-
-### Flow estimation mode
-- If \(Q\) and target \(T_{c,o}\) are known:
-  - \(\dot m_c = Q/[c_{p,c}(T_{c,o}-T_{c,i})]\)
-
-### Area sweep
-- \(A_n = A_0(1.05)^n\), for \(n = 0,1,\dots,9\)
+- Area sweep:
+  - \(A_n = A_0(1.05)^n\), for \(n = 0,1,\dots,9\)
 """)
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
@@ -74,48 +69,28 @@ def solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area):
         "T_c_out": tco,
     }
 
-def solve_from_target_q_tco(thi, tci, mh, cph, cpc, u, area, q_target, tco_target):
-    delta_tc = tco_target - tci
-    if delta_tc <= 0:
-        raise ValueError("Target cold outlet temperature must be greater than cold inlet temperature.")
-    mc = q_target / (cpc * delta_tc)
-    results = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
-    results["m_c"] = mc
-    results["Q_target"] = q_target
-    results["T_c_out_target"] = tco_target
-    results["Q_error_pct"] = ((results["Q"] - q_target) / q_target * 100.0) if q_target != 0 else 0.0
-    return results
-
-mode = st.radio(
-    "Choose NTU calculation mode",
-    [
-        "Known cold-flow rate → find outlet temperatures",
-        "Known duty and target cold outlet → estimate cold-flow rate",
-    ],
-    horizontal=True
-)
-
 with st.form("ntu_design_form"):
-    st.markdown("## Thermal inputs")
-    col1, col2, col3 = st.columns(3)
+    st.markdown("## Input values")
+    col1, col2 = st.columns(2)
 
     with col1:
-        thi = st.number_input("Hot inlet temperature, T_h,in (°C)", value=120.0)
-        tci = st.number_input("Cold inlet temperature, T_c,in (°C)", value=25.0)
-        u = st.number_input("Overall heat transfer coefficient, U (W/m²-K)", min_value=0.0, value=500.0, step=10.0)
+        thi = st.number_input("Hot Fluid Inlet Temperature (°C)", value=120.0)
+        tci = st.number_input("Initial Cold Fluid Temp (avg T of return water) (°C)", value=25.0)
+        mh = st.number_input("Mass Flow of Hot Fluid (kg/s)", min_value=0.0001, value=1.2, step=0.1, format="%.4f")
 
     with col2:
-        area = st.number_input("Initial heat transfer area, A0 (m²)", min_value=0.0, value=10.0, step=0.1)
-        mh = st.number_input("Hot mass flow rate, m_dot_h (kg/s)", min_value=0.0001, value=1.2, step=0.1, format="%.4f")
-        cph = st.number_input("Hot specific heat, c_p,h (J/kg-K)", min_value=1.0, value=2200.0, step=10.0)
+        area = st.number_input("Starting value of HX area (m²)", min_value=0.0001, value=10.0, step=0.1)
+        mc = st.number_input("Starting value of Mass Flow of Cold Fluid (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
+        u = st.number_input("Overall Heat Transfer Coefficient, U (W/m²-K)", min_value=0.0001, value=500.0, step=10.0)
 
-    with col3:
-        cpc = st.number_input("Cold specific heat, c_p,c (J/kg-K)", min_value=1.0, value=4180.0, step=10.0)
-        if mode.startswith("Known cold-flow rate"):
-            mc = st.number_input("Cold mass flow rate, m_dot_c (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
-        else:
-            q_target_kw = st.number_input("Desired heat duty, Q_target (kW)", min_value=0.001, value=120.0, step=5.0)
-            tco_target = st.number_input("Target cold outlet temperature, T_c,out,target (°C)", value=45.0)
+    st.markdown("## Fluid properties")
+    p1, p2 = st.columns(2)
+
+    with p1:
+        cph = st.number_input("Hot Fluid Specific Heat, c_p,h (J/kg-K)", min_value=1.0, value=2200.0, step=10.0)
+
+    with p2:
+        cpc = st.number_input("Cold Fluid Specific Heat, c_p,c (Water) (J/kg-K)", min_value=1.0, value=4180.0, step=10.0)
 
     submitted = st.form_submit_button("Generate 10 design results")
 
@@ -124,23 +99,17 @@ if submitted:
         if thi <= tci:
             st.error("Hot inlet temperature must be greater than cold inlet temperature.")
         elif u <= 0 or area <= 0:
-            st.error("U and initial area must both be greater than zero.")
+            st.error("U and heat exchanger area must both be greater than zero.")
         else:
             rows = []
 
             for i in range(10):
                 area_i = area * (1.05 ** i)
-
-                if mode.startswith("Known cold-flow rate"):
-                    thermal = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area_i)
-                else:
-                    thermal = solve_from_target_q_tco(
-                        thi, tci, mh, cph, cpc, u, area_i, q_target_kw * 1000.0, tco_target
-                    )
+                thermal = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area_i)
 
                 row = {
                     "Case": i + 1,
-                    "Area (m²)": area_i,
+                    "HX Area (m²)": area_i,
                     "UA (W/K)": thermal["UA"],
                     "C_h (W/K)": thermal["C_h"],
                     "C_c (W/K)": thermal["C_c"],
@@ -149,15 +118,10 @@ if submitted:
                     "C_r": thermal["C_r"],
                     "NTU": thermal["NTU"],
                     "Effectiveness": thermal["epsilon"],
-                    "Q (kW)": thermal["Q"] / 1000.0,
-                    "T_hot_out (°C)": thermal["T_h_out"],
-                    "T_cold_out (°C)": thermal["T_c_out"],
+                    "Heat Duty Q (kW)": thermal["Q"] / 1000.0,
+                    "Hot Outlet Temp (°C)": thermal["T_h_out"],
+                    "Cold Outlet Temp (°C)": thermal["T_c_out"],
                 }
-
-                if "m_c" in thermal:
-                    row["Estimated m_dot_c (kg/s)"] = thermal["m_c"]
-                    row["Q error (%)"] = thermal["Q_error_pct"]
-
                 rows.append(row)
 
             df = pd.DataFrame(rows)
@@ -165,26 +129,21 @@ if submitted:
             st.subheader("10 calculated design results")
             st.dataframe(df, use_container_width=True, hide_index=True)
 
-            st.subheader("Design summary for final sweep point")
+            st.subheader("Summary for final sweep point")
             final_row = df.iloc[-1]
 
             s1, s2, s3, s4 = st.columns(4)
-            s1.metric("Final area (m²)", f"{final_row['Area (m²)']:.4f}")
+            s1.metric("Final HX Area (m²)", f"{final_row['HX Area (m²)']:.4f}")
             s2.metric("Final UA (W/K)", f"{final_row['UA (W/K)']:.2f}")
             s3.metric("Final NTU", f"{final_row['NTU']:.4f}")
-            s4.metric("Final effectiveness", f"{final_row['Effectiveness']:.4f}")
+            s4.metric("Final Effectiveness", f"{final_row['Effectiveness']:.4f}")
 
             o1, o2 = st.columns(2)
-            o1.metric("Final hot outlet (°C)", f"{final_row['T_hot_out (°C)']:.2f}")
-            o2.metric("Final cold outlet (°C)", f"{final_row['T_cold_out (°C)']:.2f}")
-
-            if "Estimated m_dot_c (kg/s)" in df.columns:
-                e1, e2 = st.columns(2)
-                e1.metric("Estimated m_dot_c (kg/s)", f"{final_row['Estimated m_dot_c (kg/s)']:.4f}")
-                e2.metric("Q error (%)", f"{final_row['Q error (%)']:.2f}")
+            o1.metric("Hot Outlet Temp (°C)", f"{final_row['Hot Outlet Temp (°C)']:.2f}")
+            o2.metric("Cold Outlet Temp (°C)", f"{final_row['Cold Outlet Temp (°C)']:.2f}")
 
             st.caption(
-                "This sweep uses 10 area values starting from the initial area and increasing each step by 5%."
+                "This sweep uses 10 area values starting from the initial HX area and increasing each step by 5%."
             )
 
     except Exception as e:
