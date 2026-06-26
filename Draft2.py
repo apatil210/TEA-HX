@@ -336,7 +336,7 @@ if submitted:
             else:
                 st.info("No minimum cost condition reached.")
 
-            st.subheader("HX Cost vs Area")
+            st.subheader("Heat Exchanger Cost vs Area")
 
             base = alt.Chart(df).encode(
                 x=alt.X("Area_m2:Q", title="Area (m²)"),
