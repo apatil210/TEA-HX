@@ -1,7 +1,7 @@
 import math
 import pandas as pd
 import streamlit as st
-import plotly.express as px
+import altair as alt
 
 st.set_page_config(
     page_title="Heat Exchanger Design + Cost",
@@ -303,24 +303,17 @@ if submitted:
 
             st.subheader("HX Cost vs Area")
 
-            fig = px.scatter(
-                df,
-                x="Area_m2",
-                y="HX_Cost_USD",
-                labels={
-                    "Area_m2": "Area (m²)",
-                    "HX_Cost_USD": "HX Cost ($)"
-                }
+            base = alt.Chart(df).encode(
+                x=alt.X("Area_m2:Q", title="Area (m²)"),
+                y=alt.Y("HX_Cost_USD:Q", title="HX Cost ($)")
             )
 
-            fig.update_traces(mode="lines+markers")
-            fig.update_layout(
-                xaxis_title="Area (m²)",
-                yaxis_title="HX Cost ($)"
-            )
-            fig.update_yaxes(tickprefix="$")
+            line = base.mark_line()
+            points = base.mark_point(filled=True, size=80)
 
-            st.plotly_chart(fig, use_container_width=True)
+            chart = (line + points).interactive()
+
+            st.altair_chart(chart, use_container_width=True)
 
             csv = df_display.to_csv(index=False).encode("utf-8")
             st.download_button(
