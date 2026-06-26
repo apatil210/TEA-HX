@@ -7,7 +7,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("NTU Heat Exchanger Design + Shell & Tube Cost")
+st.title("Heat Exchanger Design + Cost")
 
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
