@@ -3,15 +3,15 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="NTU Heat Exchanger + Cost Sweep",
+    page_title="NTU Heat Exchanger Design",
     page_icon="♨️",
     layout="wide"
 )
 
-st.title("NTU Heat Exchanger + Cost Sweep")
+st.title("NTU Heat Exchanger Design")
 st.write(
-    "Calculate outlet temperatures, exchanger cost, and perform an area sweep with "
-    "10 points at 5% area increments to find the minimum cost."
+    "Calculate outlet temperatures and perform a 10-point area sweep with "
+    "5% area increments using the NTU / effectiveness method."
 )
 
 with st.expander("Equations used", expanded=False):
@@ -33,52 +33,9 @@ with st.expander("Equations used", expanded=False):
 - If \(Q\) and target \(T_{c,o}\) are known:
   - \(\dot m_c = Q/[c_{p,c}(T_{c,o}-T_{c,i})]\)
 
-### Cost model from the paper
-- Hot-side conductance: \(\alpha = U_h A_h\)
-- Cold-side conductance: \(\beta = U_c A_c\)
-- Cost per unit conductance:
-  - \(C(\alpha) = a\alpha^b + c\)
-- Side exchanger costs:
-  - \(\text{Cost}_{hot} = \alpha(a_h\alpha^{b_h}+c_h)\)
-  - \(\text{Cost}_{cold} = \beta(a_c\beta^{b_c}+c_c)\)
-- Total exchanger cost:
-  - \(\text{Cost}_{HX,total} = \text{Cost}_{hot} + \text{Cost}_{cold}\)
-
 ### Area sweep
 - \(A_n = A_0(1.05)^n\), for \(n = 0,1,\dots,9\)
 """)
-
-# Cost coefficients from the attached paper (Table 2)
-COST_DATABASE = {
-    "Scenario 1: <100C, water-water / water-aircooled": {
-        "hot": {"label": "Plate HX", "a": 517.37, "b": 0.82, "c": 0.03},
-        "cold": {"label": "Air-cooled HX", "a": 18023, "b": -0.90, "c": 0.90},
-    },
-    "Scenario 1: 100-175C, organic-organic / organic-aircooled": {
-        "hot": {"label": "Plate HX", "a": 348.61, "b": -0.75, "c": 0.13},
-        "cold": {"label": "Air-cooled HX", "a": 13417, "b": -0.85, "c": 1.66},
-    },
-    "Scenario 1: 175-400C, organic-organic / organic-aircooled": {
-        "hot": {"label": "Double pipe HX", "a": 1255.1, "b": -0.74, "c": 0.35},
-        "cold": {"label": "Air-cooled HX", "a": 13417, "b": -0.85, "c": 1.66},
-    },
-    "Scenario 1: >400C, molten salt-molten salt / organic-aircooled": {
-        "hot": {"label": "Shell-and-tube HX", "a": 6166, "b": -0.88, "c": 1.89},
-        "cold": {"label": "Air-cooled HX", "a": 13417, "b": -0.85, "c": 1.66},
-    },
-    "Scenario 2: <100C, water-air / water-aircooled": {
-        "hot": {"label": "Shell-and-tube HX", "a": 56401, "b": -0.87, "c": 1.53},
-        "cold": {"label": "Air-cooled HX", "a": 18023, "b": -0.90, "c": 0.90},
-    },
-    "Scenario 2: 100-400C, organic-air / organic-aircooled": {
-        "hot": {"label": "Shell-and-tube HX", "a": 59043, "b": -0.87, "c": 1.58},
-        "cold": {"label": "Air-cooled HX", "a": 13417, "b": -0.85, "c": 1.66},
-    },
-    "Scenario 2: >400C, molten salt-air / organic-aircooled": {
-        "hot": {"label": "Shell-and-tube HX", "a": 60557, "b": -0.87, "c": 2.44},
-        "cold": {"label": "Air-cooled HX", "a": 13417, "b": -0.85, "c": 1.66},
-    },
-}
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
     if ntu <= 0:
@@ -129,34 +86,6 @@ def solve_from_target_q_tco(thi, tci, mh, cph, cpc, u, area, q_target, tco_targe
     results["Q_error_pct"] = ((results["Q"] - q_target) / q_target * 100.0) if q_target != 0 else 0.0
     return results
 
-def unit_cost_from_conductance(x, a, b, c):
-    return a * (x ** b) + c
-
-def side_exchanger_cost(x, a, b, c):
-    return x * unit_cost_from_conductance(x, a, b, c)
-
-def total_exchanger_cost(alpha, beta, scenario_name):
-    scenario = COST_DATABASE[scenario_name]
-    hot = scenario["hot"]
-    cold = scenario["cold"]
-
-    hot_unit_cost = unit_cost_from_conductance(alpha, hot["a"], hot["b"], hot["c"])
-    cold_unit_cost = unit_cost_from_conductance(beta, cold["a"], cold["b"], cold["c"])
-
-    hot_cost = side_exchanger_cost(alpha, hot["a"], hot["b"], hot["c"])
-    cold_cost = side_exchanger_cost(beta, cold["a"], cold["b"], cold["c"])
-    total_cost = hot_cost + cold_cost
-
-    return {
-        "hot_unit_cost": hot_unit_cost,
-        "cold_unit_cost": cold_unit_cost,
-        "hot_cost": hot_cost,
-        "cold_cost": cold_cost,
-        "total_cost": total_cost,
-        "hot_label": hot["label"],
-        "cold_label": cold["label"],
-    }
-
 mode = st.radio(
     "Choose NTU calculation mode",
     [
@@ -166,7 +95,7 @@ mode = st.radio(
     horizontal=True
 )
 
-with st.form("ntu_cost_sweep_form"):
+with st.form("ntu_design_form"):
     st.markdown("## Thermal inputs")
     col1, col2, col3 = st.columns(3)
 
@@ -188,45 +117,7 @@ with st.form("ntu_cost_sweep_form"):
             q_target_kw = st.number_input("Desired heat duty, Q_target (kW)", min_value=0.001, value=120.0, step=5.0)
             tco_target = st.number_input("Target cold outlet temperature, T_c,out,target (°C)", value=45.0)
 
-    st.markdown("## Cost inputs")
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        cost_scenario = st.selectbox("Costing scenario from paper", list(COST_DATABASE.keys()))
-
-    with c2:
-        use_same_conductance = st.checkbox("Use same conductance for hot and cold side", value=True)
-        use_ntu_ua_for_alpha = st.checkbox("Use α = U×A from NTU area sweep", value=True)
-
-    with c3:
-        use_ntu_ua_for_beta = st.checkbox("Use β = U×A from NTU area sweep", value=True)
-        pmax_kw = st.number_input("Optional electrical power output, P_max (kW)", min_value=0.0, value=0.0, step=10.0)
-
-    manual_alpha = st.number_input(
-        "Manual hot-side conductance α (W/K), used only if box above is unchecked",
-        min_value=1.0,
-        value=5000.0,
-        step=100.0
-    )
-
-    if use_same_conductance:
-        manual_beta = manual_alpha
-        st.number_input(
-            "Manual cold-side conductance β (W/K)",
-            min_value=1.0,
-            value=float(manual_beta),
-            step=100.0,
-            disabled=True
-        )
-    else:
-        manual_beta = st.number_input(
-            "Manual cold-side conductance β (W/K), used only if box above is unchecked",
-            min_value=1.0,
-            value=8000.0,
-            step=100.0
-        )
-
-    submitted = st.form_submit_button("Generate 10 results and plot")
+    submitted = st.form_submit_button("Generate 10 design results")
 
 if submitted:
     try:
@@ -247,76 +138,50 @@ if submitted:
                         thi, tci, mh, cph, cpc, u, area_i, q_target_kw * 1000.0, tco_target
                     )
 
-                alpha_i = thermal["UA"] if use_ntu_ua_for_alpha else manual_alpha
-
-                if use_ntu_ua_for_beta:
-                    beta_i = thermal["UA"]
-                else:
-                    beta_i = manual_beta
-
-                if use_same_conductance:
-                    beta_i = alpha_i
-
-                cost = total_exchanger_cost(alpha_i, beta_i, cost_scenario)
-
                 row = {
                     "Case": i + 1,
                     "Area (m²)": area_i,
                     "UA (W/K)": thermal["UA"],
+                    "C_h (W/K)": thermal["C_h"],
+                    "C_c (W/K)": thermal["C_c"],
+                    "C_min (W/K)": thermal["C_min"],
+                    "C_max (W/K)": thermal["C_max"],
+                    "C_r": thermal["C_r"],
                     "NTU": thermal["NTU"],
                     "Effectiveness": thermal["epsilon"],
                     "Q (kW)": thermal["Q"] / 1000.0,
                     "T_hot_out (°C)": thermal["T_h_out"],
                     "T_cold_out (°C)": thermal["T_c_out"],
-                    "alpha (W/K)": alpha_i,
-                    "beta (W/K)": beta_i,
-                    "Hot cost ($)": cost["hot_cost"],
-                    "Cold cost ($)": cost["cold_cost"],
-                    "Total cost ($)": cost["total_cost"],
                 }
 
                 if "m_c" in thermal:
                     row["Estimated m_dot_c (kg/s)"] = thermal["m_c"]
                     row["Q error (%)"] = thermal["Q_error_pct"]
 
-                if pmax_kw > 0:
-                    row["C_hx ($/W)"] = cost["total_cost"] / (pmax_kw * 1000.0)
-
                 rows.append(row)
 
             df = pd.DataFrame(rows)
 
-            st.subheader("10 calculated results")
+            st.subheader("10 calculated design results")
             st.dataframe(df, use_container_width=True, hide_index=True)
 
-            st.subheader("Area vs Cost")
-            chart_df = df[["Area (m²)", "Total cost ($)"]].copy()
-            chart_df = chart_df.set_index("Area (m²)")
-            st.line_chart(chart_df)
+            st.subheader("Design summary for final sweep point")
+            final_row = df.iloc[-1]
 
-            min_idx = df["Total cost ($)"].idxmin()
-            min_row = df.loc[min_idx]
+            s1, s2, s3, s4 = st.columns(4)
+            s1.metric("Final area (m²)", f"{final_row['Area (m²)']:.4f}")
+            s2.metric("Final UA (W/K)", f"{final_row['UA (W/K)']:.2f}")
+            s3.metric("Final NTU", f"{final_row['NTU']:.4f}")
+            s4.metric("Final effectiveness", f"{final_row['Effectiveness']:.4f}")
 
-            st.subheader("Minimum cost result")
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Minimum total cost ($)", f"{min_row['Total cost ($)']:,.2f}")
-            m2.metric("Area at minimum cost (m²)", f"{min_row['Area (m²)']:.4f}")
-            m3.metric("Case number", f"{int(min_row['Case'])}")
-
-            st.markdown("### Minimum-cost case details")
-            d1, d2, d3, d4 = st.columns(4)
-            d1.metric("UA (W/K)", f"{min_row['UA (W/K)']:.2f}")
-            d2.metric("NTU", f"{min_row['NTU']:.4f}")
-            d3.metric("Cold outlet (°C)", f"{min_row['T_cold_out (°C)']:.2f}")
-            d4.metric("Hot outlet (°C)", f"{min_row['T_hot_out (°C)']:.2f}")
+            o1, o2 = st.columns(2)
+            o1.metric("Final hot outlet (°C)", f"{final_row['T_hot_out (°C)']:.2f}")
+            o2.metric("Final cold outlet (°C)", f"{final_row['T_cold_out (°C)']:.2f}")
 
             if "Estimated m_dot_c (kg/s)" in df.columns:
                 e1, e2 = st.columns(2)
-                e1.metric("Estimated m_dot_c (kg/s)", f"{min_row['Estimated m_dot_c (kg/s)']:.4f}")
-                e2.metric("Q error (%)", f"{min_row['Q error (%)']:.2f}")
-
-            if pmax_kw > 0 and "C_hx ($/W)" in df.columns:
-                st.metric("Normalized exchanger cost at minimum, C_hx ($/W)", f"{min_row['C_hx ($/W)']:.4f}")
+                e1.metric("Estimated m_dot_c (kg/s)", f"{final_row['Estimated m_dot_c (kg/s)']:.4f}")
+                e2.metric("Q error (%)", f"{final_row['Q error (%)']:.2f}")
 
             st.caption(
                 "This sweep uses 10 area values starting from the initial area and increasing each step by 5%."
