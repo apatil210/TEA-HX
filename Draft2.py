@@ -127,6 +127,12 @@ def calculate_shell_tube_cost(area_m2, exchanger_type, pressure_band, material, 
     }
 
 
+def highlight_violations(row):
+    if row["Constraint Violation"]:
+        return ["background-color: #ffdddd; color: #900000;"] * len(row)
+    return [""] * len(row)
+
+
 with st.form("ntu_single_case_form"):
     st.markdown("## Input values")
     col1, col2 = st.columns(2)
@@ -136,6 +142,8 @@ with st.form("ntu_single_case_form"):
         tci = st.number_input("Initial Cold Fluid Temp (avg T of return water) (°C)", value=25.0)
         mh = st.number_input("Mass Flow of Hot Fluid (kg/s)", min_value=0.0001, value=1.2, step=0.1, format="%.4f")
         mc = st.number_input("Mass Flow of Cold Fluid (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
+        min_hot_outlet_temp = st.number_input("Min outlet temperature for hot fluid (°C)", value=60.0)
+        max_cold_outlet_temp = st.number_input("Max outlet temperature for cold fluid (°C)", value=80.0)
 
     with col2:
         area = st.number_input("Value of HX area (m²)", min_value=0.0001, value=20.0, step=0.1)
@@ -204,6 +212,10 @@ if submitted:
             st.error("Heat exchanger area must be greater than zero.")
         elif h_hot <= 0 or h_cold <= 0 or tube_thickness <= 0 or tube_k <= 0:
             st.error("Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero.")
+        elif min_hot_outlet_temp >= thi:
+            st.error("Minimum hot outlet temperature must be less than the hot inlet temperature.")
+        elif max_cold_outlet_temp <= tci:
+            st.error("Maximum cold outlet temperature must be greater than the cold inlet temperature.")
         else:
             u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
 
@@ -220,6 +232,11 @@ if submitted:
                     ci_calc
                 )
 
+                violation = (
+                    result["T_h_out"] < min_hot_outlet_temp or
+                    result["T_c_out"] > max_cold_outlet_temp
+                )
+
                 rows.append({
                     "Iteration": i + 1,
                     "Area_m2": iter_area,
@@ -233,6 +250,7 @@ if submitted:
                     "Effectiveness": result["Effectiveness"],
                     "Q_kW": result["Q_kW"],
                     "HX_Cost_USD": cost["updated_cost"],
+                    "Constraint_Violation": violation,
                 })
 
             df = pd.DataFrame(rows)
@@ -247,6 +265,7 @@ if submitted:
                     "T_c_out_C",
                     "Q_kW",
                     "HX_Cost_USD",
+                    "Constraint_Violation",
                 ]
             ].rename(columns={
                 "Area_m2": "Area (m²)",
@@ -256,18 +275,25 @@ if submitted:
                 "T_c_out_C": "Cold Outlet Temp (°C)",
                 "Q_kW": "Heat Duty (kW)",
                 "HX_Cost_USD": "HX Cost ($)",
+                "Constraint_Violation": "Constraint Violation",
             })
-            df_display.index = df_display.index + 1
-            st.dataframe(
-                df_display.style.format({
+
+            styled_df = (
+                df_display.style
+                .apply(highlight_violations, axis=1)
+                .format({
                     "Area (m²)": "{:.4f}",
                     "Hot Inlet Temp (°C)": "{:.2f}",
                     "Hot Outlet Temp (°C)": "{:.2f}",
                     "Cold Inlet Temp (°C)": "{:.2f}",
                     "Cold Outlet Temp (°C)": "{:.2f}",
                     "Heat Duty (kW)": "{:.4f}",
-                    "Updated HX Cost ($)": "${:,.2f}",
-                }),
+                    "HX Cost ($)": "${:,.2f}",
+                })
+            )
+
+            st.dataframe(
+                styled_df,
                 use_container_width=True
             )
 
