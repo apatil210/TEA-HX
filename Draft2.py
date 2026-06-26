@@ -8,7 +8,7 @@ st.set_page_config(
 )
 
 st.title("NTU Heat Exchanger Design + Shell & Tube Cost")
-# st.write("Calculate one heat exchanger case using the NTU / effectiveness method and estimate shell-and-tube exchanger cost.")
+
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
     if ntu <= 0:
