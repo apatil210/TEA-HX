@@ -229,15 +229,15 @@ if submitted:
             st.subheader("Thermal design result")
 
             r1, r2, r3, r4 = st.columns(4)
-            r1.metric("HX Area (m²)", f"{area:.4f}")
+            # r1.metric("HX Area (m²)", f"{area:.4f}")
             r2.metric("Calculated U (W/m²-K)", f"{u:.2f}")
-            r3.metric("UA (W/K)", f"{result['UA']:.2f}")
-            r4.metric("NTU", f"{result['NTU']:.4f}")
+            # r3.metric("UA (W/K)", f"{result['UA']:.2f}")
+            # r4.metric("NTU", f"{result['NTU']:.4f}")
 
             r5, r6, r7 = st.columns(3)
-            r5.metric("Effectiveness", f"{result['Effectiveness']:.4f}")
+            # r5.metric("Effectiveness", f"{result['Effectiveness']:.4f}")
             r6.metric("Heat Duty Q (kW)", f"{result['Q_kW']:.4f}")
-            r7.metric("Capacity Ratio C_r", f"{result['C_r']:.4f}")
+            # r7.metric("Capacity Ratio C_r", f"{result['C_r']:.4f}")
 
             r8, r9 = st.columns(2)
             r8.metric("Hot Outlet Temp (°C)", f"{result['T_h_out']:.2f}")
@@ -246,8 +246,8 @@ if submitted:
             st.subheader("Shell-and-tube cost result")
 
             k1, k2, k3 = st.columns(3)
-            k1.metric("Base cost, C_B ($)", f"{cost['base_cost']:,.2f}")
-            k2.metric("Purchased cost, C_E ($)", f"{cost['purchased_cost']:,.2f}")
+            # k1.metric("Base cost, C_B ($)", f"{cost['base_cost']:,.2f}")
+            # k2.metric("Purchased cost, C_E ($)", f"{cost['purchased_cost']:,.2f}")
             k3.metric("Updated cost ($)", f"{cost['updated_cost']:,.2f}")
 
     except Exception as e:
