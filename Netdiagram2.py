@@ -1050,9 +1050,9 @@ with tab2:
         with c1:
             st.metric("Total HX capital for selected pairs", f"${st.session_state.matched_total_capital:,.2f}")
         with c2:
-            st.metric("Total pump operating cost", f"${st.session_state.matched_total_pump_cost:,.2f}/yr")
+            st.metric("Annual pump operating cost (cold fluid)", f"${st.session_state.matched_total_pump_cost:,.2f}/yr")
         with c3:
-            st.metric("Total annual cost", f"${st.session_state.matched_total_annual_cost:,.2f}/yr")
+            st.metric("Total annual cost of heat Integration", f"${st.session_state.matched_total_annual_cost:,.2f}/yr")
         with c4:
             st.metric("Total heat integration", f"{st.session_state.matched_total_heat_duty:.4f} kW")
 
@@ -1066,9 +1066,9 @@ with tab2:
         with c2:
             st.metric("Total HX capital", f"${st.session_state.optimized_total_capital:,.2f}")
         with c3:
-            st.metric("Total pump operating cost", f"${st.session_state.optimized_total_pump_cost:,.2f}/yr")
+            st.metric("Annual pump operating cost (cold fluid)", f"${st.session_state.optimized_total_pump_cost:,.2f}/yr")
         with c4:
-            st.metric("Total annual cost", f"${st.session_state.optimized_total_annual_cost:,.2f}/yr")
+            st.metric("Total annual cost of heat Integration", f"${st.session_state.optimized_total_annual_cost:,.2f}/yr")
 
         total_assignments = math.factorial(4) * math.factorial(4)
         st.caption(
