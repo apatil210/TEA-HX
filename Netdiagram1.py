@@ -567,6 +567,22 @@ with tab2:
         "ci_calc": 800.0,
     }
 
+    if "matched_results_df" not in st.session_state:
+        st.session_state.matched_results_df = None
+    if "matched_total_cost" not in st.session_state:
+        st.session_state.matched_total_cost = None
+    if "matched_total_heat_duty" not in st.session_state:
+        st.session_state.matched_total_heat_duty = None
+
+    if "optimized_results_df" not in st.session_state:
+        st.session_state.optimized_results_df = None
+    if "optimized_total_cost" not in st.session_state:
+        st.session_state.optimized_total_cost = None
+    if "optimized_total_q" not in st.session_state:
+        st.session_state.optimized_total_q = None
+    if "optimized_feasible_count" not in st.session_state:
+        st.session_state.optimized_feasible_count = None
+
     st.markdown("## 1) Heat sources")
     source_tabs = st.tabs([f"Source {i}" for i in range(1, 5)])
     sources = []
@@ -716,20 +732,11 @@ with tab2:
 
         if results_rows:
             results_df = pd.DataFrame(results_rows)
-            total_cost = results_df["HX cost numeric"].sum()
-            total_heat_duty = results_df["Heat duty numeric"].sum()
-
-            display_df = results_df.drop(columns=["HX cost numeric", "Heat duty numeric"])
-
-            st.subheader("Matched results")
-            st.dataframe(display_df, use_container_width=True)
-
-            st.markdown("## 5) Total cost of heat integration")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.metric("Total cost of heat integration", f"${total_cost:,.2f}")
-            with c2:
-                st.metric("Total heat integration", f"{total_heat_duty:.4f} kW")
+            st.session_state.matched_total_cost = results_df["HX cost numeric"].sum()
+            st.session_state.matched_total_heat_duty = results_df["Heat duty numeric"].sum()
+            st.session_state.matched_results_df = results_df.drop(
+                columns=["HX cost numeric", "Heat duty numeric"]
+            )
 
     st.markdown("## 6) Optimize for Maximum Heat Integration")
     st.caption(
@@ -841,20 +848,42 @@ with tab2:
                         best_total_q = current_total_q
 
         if best_solution is not None:
-            best_df = pd.DataFrame(best_solution)
-
-            st.subheader("Optimal matched results for maximum heat integration")
-            st.dataframe(best_df, use_container_width=True)
-
-            c1, c2 = st.columns(2)
-            with c1:
-                st.metric("Maximum total heat integration", f"{best_total_q:.4f} kW")
-            with c2:
-                st.metric("Cost for maximum heat integration", f"${best_total_cost:,.2f}")
-
-            st.caption(
-                f"Feasible assignments found: {feasible_count} "
-                f"out of {len(sink_permutations) * len(hx_permutations)} total assignments checked."
-            )
+            st.session_state.optimized_results_df = pd.DataFrame(best_solution)
+            st.session_state.optimized_total_cost = best_total_cost
+            st.session_state.optimized_total_q = best_total_q
+            st.session_state.optimized_feasible_count = feasible_count
         else:
-            st.warning("No feasible one-to-one assignment found for the given inputs.")
+            st.session_state.optimized_results_df = None
+            st.session_state.optimized_total_cost = None
+            st.session_state.optimized_total_q = None
+            st.session_state.optimized_feasible_count = 0
+
+    if st.session_state.matched_results_df is not None:
+        st.subheader("Matched results")
+        st.dataframe(st.session_state.matched_results_df, use_container_width=True)
+
+        st.markdown("## 5) Total cost of heat integration")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("Total cost of heat integration", f"${st.session_state.matched_total_cost:,.2f}")
+        with c2:
+            st.metric("Total heat integration", f"{st.session_state.matched_total_heat_duty:.4f} kW")
+
+    if st.session_state.optimized_results_df is not None:
+        st.subheader("Optimal matched results for maximum heat integration")
+        st.dataframe(st.session_state.optimized_results_df, use_container_width=True)
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("Maximum total heat integration", f"{st.session_state.optimized_total_q:.4f} kW")
+        with c2:
+            st.metric("Cost for maximum heat integration", f"${st.session_state.optimized_total_cost:,.2f}")
+
+        total_assignments = math.factorial(4) * math.factorial(4)
+        st.caption(
+            f"Feasible assignments found: {st.session_state.optimized_feasible_count} "
+            f"out of {total_assignments} total assignments checked."
+        )
+    elif optimize:
+        st.warning("No feasible one-to-one assignment found for the given inputs.")
+        
