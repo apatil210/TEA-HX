@@ -738,14 +738,11 @@ with tab2:
                 columns=["HX cost numeric", "Heat duty numeric"]
             )
 
-    st.markdown("## Optimize for Maximum Heat Integration")
-    st.caption(
-        "Automatically find the one-to-one pairing of heat sources, heat sinks, "
-        "and heat exchangers that gives the maximum total heat integration."
-    )
+    
 
     optimize = st.button("Click to Optimize for maximum heat integration", type="secondary")
-
+    st.markdown("## Results")
+    
     if optimize:
         best_solution = None
         best_total_cost = None
