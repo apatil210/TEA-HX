@@ -8,7 +8,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Heat Exchanger Matching + Cost")
+st.title("Heat Integration Cost Optimization")
 st.caption(
     "Enter 4 heat sources, 4 heat sinks, and 4 heat exchangers, "
     "then assign each source to one unique sink and one unique exchanger."
