@@ -701,12 +701,7 @@ with tab1:
                     st.altair_chart(chart_tac, use_container_width=True)
 
                     csv = df_display.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        label="Download results as CSV",
-                        data=csv,
-                        file_name="heat_exchanger_iteration_results.csv",
-                        mime="text/csv"
-                    )
+                    
 
             except Exception as e:
                 st.error(str(e))
