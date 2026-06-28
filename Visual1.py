@@ -377,103 +377,104 @@ def render_exchanger_inputs(hx_num, defaults):
 
 def render_pairing_diagram(df_pairs, title):
     if df_pairs is None or df_pairs.empty:
-        return
-
-    y_map = {
-        "Source 1": 4,
-        "Source 2": 3,
-        "Source 3": 2,
-        "Source 4": 1,
-        "Sink 1": 4,
-        "Sink 2": 3,
-        "Sink 3": 2,
-        "Sink 4": 1,
-    }
-
-    node_rows = []
-    for i in range(1, 5):
-        node_rows.append({"label": f"Heat Source\n{i}", "name": f"Source {i}", "x": 0.7, "y": y_map[f"Source {i}"]})
-        node_rows.append({"label": f"Heat Sink\n{i}", "name": f"Sink {i}", "x": 9.3, "y": y_map[f"Sink {i}"]})
-    nodes = pd.DataFrame(node_rows)
-
-    line_rows = []
-    label_rows = []
-    for _, row in df_pairs.iterrows():
-        src = row.get("Source")
-        snk = row.get("Sink")
-        hx = row.get("Exchanger", "")
-        if src not in y_map or snk not in y_map:
-            continue
-
-        y1 = y_map[src]
-        y2 = y_map[snk]
-        mid1 = 3.3
-        mid2 = 6.7
-
-        line_rows.extend([
-            {"x": 1.75, "y": y1, "x2": mid1, "y2": y1, "source": src, "sink": snk, "hx": hx},
-            {"x": mid1, "y": y1, "x2": mid1, "y2": y2, "source": src, "sink": snk, "hx": hx},
-            {"x": mid1, "y": y2, "x2": mid2, "y2": y2, "source": src, "sink": snk, "hx": hx},
-            {"x": mid2, "y": y2, "x2": 8.25, "y2": y2, "source": src, "sink": snk, "hx": hx},
-        ])
-
-        if hx:
-            label_rows.append({"x": 5.0, "y": y2 + 0.13, "label": hx})
-
-    if not line_rows:
         st.info("No valid source-sink pairs available to visualize.")
         return
 
-    lines = pd.DataFrame(line_rows)
-    labels = pd.DataFrame(label_rows)
+    source_y = {
+        "Source 1": 90,
+        "Source 2": 230,
+        "Source 3": 370,
+        "Source 4": 510,
+    }
+    sink_y = {
+        "Sink 1": 90,
+        "Sink 2": 230,
+        "Sink 3": 370,
+        "Sink 4": 510,
+    }
 
-    line_chart = alt.Chart(lines).mark_rule(color="#2f6f9f", strokeWidth=3).encode(
-        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[0, 10])),
-        y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5])),
-        x2="x2:Q",
-        y2="y2:Q",
-        tooltip=["source:N", "sink:N", "hx:N"]
-    )
+    width = 1000
+    height = 600
+    left_x = 110
+    right_x = 890
+    rx = 115
+    ry = 55
 
-    node_chart = alt.Chart(nodes).mark_circle(
-        size=13000,
-        color="#2b638f",
-        stroke="#17384f",
-        strokeWidth=2
-    ).encode(
-        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[0, 10])),
-        y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5]))
-    )
+    line_parts = []
+    label_parts = []
+    used_lanes = [330, 380, 430, 480]
 
-    node_text = alt.Chart(nodes).mark_text(
-        color="white",
-        fontSize=15,
-        fontWeight="bold",
-        align="center",
-        baseline="middle",
-        lineBreak="\n"
-    ).encode(
-        x="x:Q",
-        y="y:Q",
-        text="label:N"
-    )
+    for idx, (_, row) in enumerate(df_pairs.iterrows()):
+        src = row.get("Source")
+        snk = row.get("Sink")
+        hx = row.get("Exchanger", "")
 
-    chart = line_chart + node_chart + node_text
+        if src not in source_y or snk not in sink_y:
+            continue
 
-    if not labels.empty:
-        hx_text = alt.Chart(labels).mark_text(
-            color="#1f2933",
-            fontSize=12,
-            fontWeight="bold"
-        ).encode(
-            x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[0, 10])),
-            y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5])),
-            text="label:N"
-        )
-        chart = chart + hx_text
+        y1 = source_y[src]
+        y2 = sink_y[snk]
+        lane_x = used_lanes[idx % len(used_lanes)]
 
-    chart = chart.properties(title=title, height=460).configure_view(stroke=None)
-    st.altair_chart(chart, use_container_width=True)
+        x_start = left_x + rx
+        x_end = right_x - rx
+
+        path = f"""
+        <path d="M {x_start} {y1}
+                 L {lane_x} {y1}
+                 L {lane_x} {y2}
+                 L {x_end} {y2}"
+              fill="none"
+              stroke="#2f6f9f"
+              stroke-width="3"/>
+        """
+        line_parts.append(path)
+
+        if hx:
+            label_parts.append(
+                f'<text x="{lane_x + 8}" y="{(y1 + y2) / 2 - 6}" '
+                f'font-size="14" fill="#1f2933" font-weight="bold">{hx}</text>'
+            )
+
+    node_parts = []
+    for i in range(1, 5):
+        sy = source_y[f"Source {i}"]
+        ty = sink_y[f"Sink {i}"]
+
+        node_parts.append(f'''
+        <ellipse cx="{left_x}" cy="{sy}" rx="{rx}" ry="{ry}"
+                 fill="#2b638f" stroke="#17384f" stroke-width="2"/>
+        <text x="{left_x}" y="{sy - 18}" text-anchor="middle"
+              font-size="18" fill="white" font-weight="bold">Heat</text>
+        <text x="{left_x}" y="{sy + 8}" text-anchor="middle"
+              font-size="18" fill="white" font-weight="bold">Source</text>
+        <text x="{left_x}" y="{sy + 34}" text-anchor="middle"
+              font-size="18" fill="white" font-weight="bold">{i}</text>
+        ''')
+
+        node_parts.append(f'''
+        <ellipse cx="{right_x}" cy="{ty}" rx="{rx}" ry="{ry}"
+                 fill="#2b638f" stroke="#17384f" stroke-width="2"/>
+        <text x="{right_x}" y="{ty - 5}" text-anchor="middle"
+              font-size="18" fill="white" font-weight="bold">Heat Sink</text>
+        <text x="{right_x}" y="{ty + 25}" text-anchor="middle"
+              font-size="18" fill="white" font-weight="bold">{i}</text>
+        ''')
+
+    svg = f"""
+    <div style="width:100%; overflow-x:auto; padding-top:10px;">
+      <svg width="{width}" height="{height}" viewBox="0 0 {width} {height}"
+           xmlns="http://www.w3.org/2000/svg"
+           style="background:white; border-radius:12px;">
+        <text x="30" y="35" font-size="26" font-weight="bold" fill="#1f2933">{title}</text>
+        {''.join(line_parts)}
+        {''.join(label_parts)}
+        {''.join(node_parts)}
+      </svg>
+    </div>
+    """
+
+    st.markdown(svg, unsafe_allow_html=True)
 
 
 def reset_invalid_choice(widget_key, valid_options):
