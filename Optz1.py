@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 st.title("Heat Exchanger Design + Cost")
-st.caption("4 hot/cold stream pairs using the same heat exchanger design and cost basis.")
+st.caption("Calculate performance and cost for up to 4 heat source-sink pairs.")
 
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
@@ -128,212 +128,281 @@ def calculate_shell_tube_cost(area_m2, exchanger_type, pressure_band, material, 
     }
 
 
-NUM_PAIRS = 4
+def render_case_inputs(case_num, defaults):
+    st.markdown(f"## Pair {case_num}")
 
-with st.form("hx_multi_case_form"):
-    st.markdown("## Shared heat exchanger inputs")
     col1, col2 = st.columns(2)
 
     with col1:
-        area = st.number_input("Value of HX area (m²)", min_value=0.0001, value=20.0, step=0.1)
-        h_hot = st.number_input("HT Coeff of Hot Fluid, h_hot (W/m²-K)", min_value=0.0001, value=1000.0, step=10.0)
-        h_cold = st.number_input("HT Coeff of Cold Fluid, h_cold (W/m²-K)", min_value=0.0001, value=1500.0, step=10.0)
+        thi = st.number_input(
+            f"Hot Fluid Inlet Temperature (°C) - Pair {case_num}",
+            value=defaults["thi"],
+            key=f"thi_{case_num}"
+        )
+        tci = st.number_input(
+            f"Initial Cold Fluid Temp (°C) - Pair {case_num}",
+            value=defaults["tci"],
+            key=f"tci_{case_num}"
+        )
+        mh = st.number_input(
+            f"Mass Flow of Hot Fluid (kg/s) - Pair {case_num}",
+            min_value=0.0001,
+            value=defaults["mh"],
+            step=0.1,
+            format="%.4f",
+            key=f"mh_{case_num}"
+        )
+        mc = st.number_input(
+            f"Mass Flow of Cold Fluid (kg/s) - Pair {case_num}",
+            min_value=0.0001,
+            value=defaults["mc"],
+            step=0.1,
+            format="%.4f",
+            key=f"mc_{case_num}"
+        )
 
     with col2:
-        tube_thickness = st.number_input(
-            "Tube Thickness, t (m)",
-            min_value=0.000001,
-            value=0.001,
-            step=0.0001,
-            format="%.6f"
+        area = st.number_input(
+            f"HX Area (m²) - Pair {case_num}",
+            min_value=0.0001,
+            value=defaults["area"],
+            step=0.1,
+            key=f"area_{case_num}"
         )
-        tube_k = st.number_input("Tube Therm Cond, k (W/m-K)", min_value=0.0001, value=15.0, step=0.5)
+        h_hot = st.number_input(
+            f"h_hot (W/m²-K) - Pair {case_num}",
+            min_value=0.0001,
+            value=defaults["h_hot"],
+            step=10.0,
+            key=f"h_hot_{case_num}"
+        )
+        h_cold = st.number_input(
+            f"h_cold (W/m²-K) - Pair {case_num}",
+            min_value=0.0001,
+            value=defaults["h_cold"],
+            step=10.0,
+            key=f"h_cold_{case_num}"
+        )
 
-    st.markdown("## Shared shell-and-tube cost inputs")
+    st.markdown("### Tube properties")
+    t1, t2 = st.columns(2)
+
+    with t1:
+        tube_thickness = st.number_input(
+            f"Tube Thickness, t (m) - Pair {case_num}",
+            min_value=0.000001,
+            value=defaults["tube_thickness"],
+            step=0.0001,
+            format="%.6f",
+            key=f"tube_thickness_{case_num}"
+        )
+
+    with t2:
+        tube_k = st.number_input(
+            f"Tube Thermal Conductivity, k (W/m-K) - Pair {case_num}",
+            min_value=0.0001,
+            value=defaults["tube_k"],
+            step=0.5,
+            key=f"tube_k_{case_num}"
+        )
+
+    st.markdown("### Fluid properties")
+    p1, p2 = st.columns(2)
+
+    with p1:
+        cph = st.number_input(
+            f"Hot Fluid Specific Heat, c_p,h (J/kg-K) - Pair {case_num}",
+            min_value=1.0,
+            value=defaults["cph"],
+            step=10.0,
+            key=f"cph_{case_num}"
+        )
+
+    with p2:
+        cpc = st.number_input(
+            f"Cold Fluid Specific Heat, c_p,c (J/kg-K) - Pair {case_num}",
+            min_value=1.0,
+            value=defaults["cpc"],
+            step=10.0,
+            key=f"cpc_{case_num}"
+        )
+
+    st.markdown("### Shell-and-tube cost inputs")
     c1, c2, c3 = st.columns(3)
 
     with c1:
         exchanger_type = st.selectbox(
-            "Exchanger type",
-            ["Floating head", "Fixed head", "U-tube", "Kettle reboiler"]
+            f"Exchanger type - Pair {case_num}",
+            ["Floating head", "Fixed head", "U-tube", "Kettle reboiler"],
+            index=["Floating head", "Fixed head", "U-tube", "Kettle reboiler"].index(defaults["exchanger_type"]),
+            key=f"exchanger_type_{case_num}"
         )
         material = st.selectbox(
-            "Material of construction",
+            f"Material - Pair {case_num}",
             [
                 "Carbon steel (base)", "SS304", "SS316", "SS347",
                 "Nickel 200", "Monel 400", "Inconel 600",
                 "Incoloy 825", "Titanium", "Hastelloy"
-            ]
+            ],
+            index=[
+                "Carbon steel (base)", "SS304", "SS316", "SS347",
+                "Nickel 200", "Monel 400", "Inconel 600",
+                "Incoloy 825", "Titanium", "Hastelloy"
+            ].index(defaults["material"]),
+            key=f"material_{case_num}"
         )
 
     with c2:
         pressure_band = st.selectbox(
-            "Design pressure band",
-            ["Up to 700 kPag (base)", "700–2100 kPag", "2100–4200 kPag", "4200–6200 kPag"]
+            f"Pressure band - Pair {case_num}",
+            ["Up to 700 kPag (base)", "700–2100 kPag", "2100–4200 kPag", "4200–6200 kPag"],
+            index=[
+                "Up to 700 kPag (base)", "700–2100 kPag", "2100–4200 kPag", "4200–6200 kPag"
+            ].index(defaults["pressure_band"]),
+            key=f"pressure_band_{case_num}"
         )
-        ci_base = st.number_input("Base cost index", min_value=0.0001, value=500.0, step=1.0)
+        ci_base = st.number_input(
+            f"Base cost index - Pair {case_num}",
+            min_value=0.0001,
+            value=defaults["ci_base"],
+            step=1.0,
+            key=f"ci_base_{case_num}"
+        )
 
     with c3:
-        ci_calc = st.number_input("Calculation-year cost index", min_value=0.0001, value=800.0, step=1.0)
+        ci_calc = st.number_input(
+            f"Calculation-year cost index - Pair {case_num}",
+            min_value=0.0001,
+            value=defaults["ci_calc"],
+            step=1.0,
+            key=f"ci_calc_{case_num}"
+        )
 
-    st.markdown("## Inputs for 4 heat source-sink pairs")
+    return {
+        "thi": thi,
+        "tci": tci,
+        "mh": mh,
+        "mc": mc,
+        "area": area,
+        "h_hot": h_hot,
+        "h_cold": h_cold,
+        "tube_thickness": tube_thickness,
+        "tube_k": tube_k,
+        "cph": cph,
+        "cpc": cpc,
+        "exchanger_type": exchanger_type,
+        "material": material,
+        "pressure_band": pressure_band,
+        "ci_base": ci_base,
+        "ci_calc": ci_calc,
+    }
 
-    pair_inputs = []
-    tabs = st.tabs([f"Pair {i}" for i in range(1, NUM_PAIRS + 1)])
 
-    default_values = [
-        {"thi": 120.0, "tci": 25.0, "mh": 1.2, "mc": 1.0, "cph": 2200.0, "cpc": 4180.0},
-        {"thi": 115.0, "tci": 25.0, "mh": 1.1, "mc": 1.0, "cph": 2200.0, "cpc": 4180.0},
-        {"thi": 110.0, "tci": 25.0, "mh": 1.0, "mc": 1.0, "cph": 2200.0, "cpc": 4180.0},
-        {"thi": 105.0, "tci": 25.0, "mh": 0.9, "mc": 1.0, "cph": 2200.0, "cpc": 4180.0},
-    ]
+default_case = {
+    "thi": 120.0,
+    "tci": 25.0,
+    "mh": 1.2,
+    "mc": 1.0,
+    "area": 20.0,
+    "h_hot": 1000.0,
+    "h_cold": 1500.0,
+    "tube_thickness": 0.001,
+    "tube_k": 15.0,
+    "cph": 2200.0,
+    "cpc": 4180.0,
+    "exchanger_type": "Floating head",
+    "material": "Carbon steel (base)",
+    "pressure_band": "Up to 700 kPag (base)",
+    "ci_base": 500.0,
+    "ci_calc": 800.0,
+}
+
+with st.form("hx_multi_case_form"):
+    st.markdown("Enter data for 4 heat source-sink pairs.")
+
+    tabs = st.tabs(["Pair 1", "Pair 2", "Pair 3", "Pair 4"])
+    all_cases = []
 
     for i, tab in enumerate(tabs, start=1):
         with tab:
-            st.markdown(f"### Pair {i}")
-            pcol1, pcol2 = st.columns(2)
+            case_inputs = render_case_inputs(i, default_case)
+            all_cases.append(case_inputs)
 
-            with pcol1:
-                thi = st.number_input(
-                    f"Hot Fluid Inlet Temperature (°C) - Pair {i}",
-                    value=default_values[i - 1]["thi"],
-                    key=f"thi_{i}"
-                )
-                tci = st.number_input(
-                    f"Initial Cold Fluid Temp (°C) - Pair {i}",
-                    value=default_values[i - 1]["tci"],
-                    key=f"tci_{i}"
-                )
-                mh = st.number_input(
-                    f"Mass Flow of Hot Fluid (kg/s) - Pair {i}",
-                    min_value=0.0001,
-                    value=default_values[i - 1]["mh"],
-                    step=0.1,
-                    format="%.4f",
-                    key=f"mh_{i}"
-                )
-
-            with pcol2:
-                mc = st.number_input(
-                    f"Mass Flow of Cold Fluid (kg/s) - Pair {i}",
-                    min_value=0.0001,
-                    value=default_values[i - 1]["mc"],
-                    step=0.1,
-                    format="%.4f",
-                    key=f"mc_{i}"
-                )
-                cph = st.number_input(
-                    f"Hot Fluid Specific Heat, c_p,h (J/kg-K) - Pair {i}",
-                    min_value=1.0,
-                    value=default_values[i - 1]["cph"],
-                    step=10.0,
-                    key=f"cph_{i}"
-                )
-                cpc = st.number_input(
-                    f"Cold Fluid Specific Heat, c_p,c (J/kg-K) - Pair {i}",
-                    min_value=1.0,
-                    value=default_values[i - 1]["cpc"],
-                    step=10.0,
-                    key=f"cpc_{i}"
-                )
-
-            pair_inputs.append({
-                "pair": i,
-                "thi": thi,
-                "tci": tci,
-                "mh": mh,
-                "mc": mc,
-                "cph": cph,
-                "cpc": cpc
-            })
-
-    submitted = st.form_submit_button("Calculate all 4 pairs")
+    submitted = st.form_submit_button("Calculate All Pairs")
 
 
 if submitted:
-    try:
-        validation_errors = []
+    results_rows = []
+    has_error = False
 
-        if area <= 0:
-            validation_errors.append("Heat exchanger area must be greater than zero.")
-        if h_hot <= 0 or h_cold <= 0 or tube_thickness <= 0 or tube_k <= 0:
-            validation_errors.append(
-                "Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero."
+    for i, case in enumerate(all_cases, start=1):
+        try:
+            if case["thi"] <= case["tci"]:
+                st.error(f"Pair {i}: Hot inlet temperature must be greater than cold inlet temperature.")
+                has_error = True
+                continue
+
+            if case["area"] <= 0:
+                st.error(f"Pair {i}: Heat exchanger area must be greater than zero.")
+                has_error = True
+                continue
+
+            if (
+                case["h_hot"] <= 0
+                or case["h_cold"] <= 0
+                or case["tube_thickness"] <= 0
+                or case["tube_k"] <= 0
+            ):
+                st.error(f"Pair {i}: Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero.")
+                has_error = True
+                continue
+
+            u = calculate_overall_u(
+                case["h_hot"],
+                case["h_cold"],
+                case["tube_thickness"],
+                case["tube_k"]
             )
 
-        for pair in pair_inputs:
-            if pair["thi"] <= pair["tci"]:
-                validation_errors.append(
-                    f"Pair {pair['pair']}: Hot inlet temperature must be greater than cold inlet temperature."
-                )
-            if pair["mh"] <= 0 or pair["mc"] <= 0:
-                validation_errors.append(
-                    f"Pair {pair['pair']}: Mass flow rates must be greater than zero."
-                )
-            if pair["cph"] <= 0 or pair["cpc"] <= 0:
-                validation_errors.append(
-                    f"Pair {pair['pair']}: Specific heats must be greater than zero."
-                )
+            result = solve_known_mc(
+                case["thi"],
+                case["tci"],
+                case["mh"],
+                case["mc"],
+                case["cph"],
+                case["cpc"],
+                u,
+                case["area"]
+            )
 
-        if validation_errors:
-            for err in validation_errors:
-                st.error(err)
-        else:
-            u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
             cost = calculate_shell_tube_cost(
-                area,
-                exchanger_type,
-                pressure_band,
-                material,
-                ci_base,
-                ci_calc
+                case["area"],
+                case["exchanger_type"],
+                case["pressure_band"],
+                case["material"],
+                case["ci_base"],
+                case["ci_calc"]
             )
 
-            results_rows = []
-
-            for pair in pair_inputs:
-                result = solve_known_mc(
-                    pair["thi"],
-                    pair["tci"],
-                    pair["mh"],
-                    pair["mc"],
-                    pair["cph"],
-                    pair["cpc"],
-                    u,
-                    area
-                )
-
-                results_rows.append({
-                    "Pair": f"Pair {pair['pair']}",
-                    "Hot inlet (°C)": f"{pair['thi']:.2f}",
-                    "Cold inlet (°C)": f"{pair['tci']:.2f}",
-                    "Hot outlet (°C)": f"{result['T_h_out']:.2f}",
-                    "Cold outlet (°C)": f"{result['T_c_out']:.2f}",
-                    "Heat duty (kW)": f"{result['Q_kW']:.4f}",
-                    "UA (W/K)": f"{result['UA']:.2f}",
-                    "NTU": f"{result['NTU']:.4f}",
-                    "Effectiveness": f"{result['Effectiveness']:.4f}",
-                })
-
-            results_df = pd.DataFrame(results_rows)
-
-            st.subheader("Results for all 4 pairs")
-            st.table(results_df)
-
-            st.subheader("Shared heat exchanger summary")
-            shared_df = pd.DataFrame({
-                "Parameter": [
-                    "Overall heat transfer coefficient, U (W/m²-K)",
-                    "Heat exchanger area (m²)",
-                    "Shared exchanger cost ($)"
-                ],
-                "Value": [
-                    f"{u:.2f}",
-                    f"{area:.2f}",
-                    f"${cost['updated_cost']:,.2f}"
-                ]
+            results_rows.append({
+                "Pair": f"Pair {i}",
+                "Hot outlet temp (°C)": f"{result['T_h_out']:.2f}",
+                "Cold outlet temp (°C)": f"{result['T_c_out']:.2f}",
+                "Heat duty (kW)": f"{result['Q_kW']:.4f}",
+                "Overall U (W/m²-K)": f"{u:.2f}",
+                "NTU": f"{result['NTU']:.4f}",
+                "Effectiveness": f"{result['Effectiveness']:.4f}",
+                "HX cost ($)": f"${cost['updated_cost']:,.2f}",
             })
-            st.table(shared_df)
 
-    except Exception as e:
-        st.error(str(e))
+        except Exception as e:
+            st.error(f"Pair {i}: {str(e)}")
+            has_error = True
+
+    if results_rows:
+        st.subheader("Results for all pairs")
+        results_df = pd.DataFrame(results_rows)
+        st.dataframe(results_df, use_container_width=True)
+
+    if not results_rows and has_error:
+        st.warning("No valid pair could be calculated.")
