@@ -708,6 +708,7 @@ with tab2:
                         "Effectiveness": f"{result['Effectiveness']:.4f}",
                         "HX cost ($)": f"${cost['updated_cost']:,.2f}",
                         "HX cost numeric": cost["updated_cost"],
+                        "Heat duty numeric": result["Q_kW"],
                     })
 
                 except Exception as e:
@@ -716,22 +717,27 @@ with tab2:
         if results_rows:
             results_df = pd.DataFrame(results_rows)
             total_cost = results_df["HX cost numeric"].sum()
+            total_heat_duty = results_df["Heat duty numeric"].sum()
 
-            display_df = results_df.drop(columns=["HX cost numeric"])
+            display_df = results_df.drop(columns=["HX cost numeric", "Heat duty numeric"])
 
             st.subheader("Matched results")
             st.dataframe(display_df, use_container_width=True)
 
             st.markdown("## 5) Total cost of heat integration")
-            st.metric("Total cost of heat integration", f"${total_cost:,.2f}")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("Total cost of heat integration", f"${total_cost:,.2f}")
+            with c2:
+                st.metric("Total heat integration", f"{total_heat_duty:.4f} kW")
 
-    st.markdown("## 6) Optimize Heat Integration Cost")
+    st.markdown("## 6) Optimize for Maximum Heat Integration")
     st.caption(
         "Automatically find the one-to-one pairing of heat sources, heat sinks, "
-        "and heat exchangers that gives the least-cost feasible result."
+        "and heat exchangers that gives the maximum total heat integration."
     )
 
-    optimize = st.button("Optimize heat integration cost", type="secondary")
+    optimize = st.button("Optimize for maximum heat integration", type="secondary")
 
     if optimize:
         best_solution = None
@@ -824,10 +830,10 @@ with tab2:
 
                     if (
                         best_solution is None
-                        or current_total_cost < best_total_cost
+                        or current_total_q > best_total_q
                         or (
-                            abs(current_total_cost - best_total_cost) < 1e-9
-                            and current_total_q > best_total_q
+                            abs(current_total_q - best_total_q) < 1e-9
+                            and current_total_cost < best_total_cost
                         )
                     ):
                         best_solution = current_rows
@@ -837,14 +843,14 @@ with tab2:
         if best_solution is not None:
             best_df = pd.DataFrame(best_solution)
 
-            st.subheader("Optimal matched results")
+            st.subheader("Optimal matched results for maximum heat integration")
             st.dataframe(best_df, use_container_width=True)
 
             c1, c2 = st.columns(2)
             with c1:
-                st.metric("Optimal total cost", f"${best_total_cost:,.2f}")
+                st.metric("Maximum total heat integration", f"{best_total_q:.4f} kW")
             with c2:
-                st.metric("Optimal total heat duty", f"{best_total_q:.4f} kW")
+                st.metric("Cost for maximum heat integration", f"${best_total_cost:,.2f}")
 
             st.caption(
                 f"Feasible assignments found: {feasible_count} "
