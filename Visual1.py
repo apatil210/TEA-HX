@@ -13,7 +13,7 @@ st.set_page_config(
 st.title("Heat Exchanger Tools")
 st.caption("Two tools in one Streamlit app: single heat-exchanger design/cost and heat-integration matching optimization.")
 
-ELECTRICITY_COST_PER_KWH = 0.0866  # USD/kWh
+ELECTRICITY_COST_PER_KWH = 0.0866
 MOTOR_EFFICIENCY = 0.95
 PUMP_HEAD_M = 1.0
 HX_LIFE_YEARS = 10.0
@@ -48,7 +48,6 @@ def solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area):
     q = eps * qmax
     tho = thi - q / ch
     tco = tci + q / cc
-
     return {
         "UA": ua,
         "C_h": ch,
@@ -140,7 +139,6 @@ def calculate_shell_tube_cost(area_m2, exchanger_type, pressure_band, material, 
 def pumping_power_kw(mc, pump_eff, density=WATER_DENSITY, g=G_ACCEL):
     if mc <= 0 or pump_eff <= 0 or MOTOR_EFFICIENCY <= 0:
         return 0.0
-
     p_hydraulic_w = mc * g * PUMP_HEAD_M / density
     p_shaft_w = p_hydraulic_w / pump_eff
     p_elec_w = p_shaft_w / MOTOR_EFFICIENCY
@@ -163,18 +161,10 @@ def total_annual_cost(hx_cost, pump_cost_year):
 
 def style_temperature_cells(df_in, min_hot_outlet_temp, max_cold_outlet_temp):
     styles = pd.DataFrame("", index=df_in.index, columns=df_in.columns)
-
     hot_col = "Hot Outlet Temp (°C)"
     cold_col = "Cold Outlet Temp (°C)"
-
-    styles.loc[df_in[hot_col] < min_hot_outlet_temp, hot_col] = (
-        "background-color: #ff4d4f; color: white;"
-    )
-
-    styles.loc[df_in[cold_col] > max_cold_outlet_temp, cold_col] = (
-        "background-color: #ff4d4f; color: white;"
-    )
-
+    styles.loc[df_in[hot_col] < min_hot_outlet_temp, hot_col] = "background-color: #ff4d4f; color: white;"
+    styles.loc[df_in[cold_col] > max_cold_outlet_temp, cold_col] = "background-color: #ff4d4f; color: white;"
     return styles
 
 
@@ -187,25 +177,18 @@ def adjust_cold_mass_flow_to_constraints(
 ):
     if target_hot_outlet_temp >= thi:
         raise ValueError("Minimum hot outlet target must be less than hot inlet temperature.")
-
     if max_cold_mass_flow <= 0:
         raise ValueError("Maximum cold fluid flowrate must be greater than zero.")
 
     low_mc = 1e-6
     high_mc = max_cold_mass_flow
-
     low_result = solve_known_mc(thi, tci, mh, low_mc, cph, cpc, u, area)
     high_result = solve_known_mc(thi, tci, mh, high_mc, cph, cpc, u, area)
 
     if low_result["T_h_out"] < target_hot_outlet_temp:
-        raise ValueError(
-            "Target hot outlet temperature cannot be achieved even at near-zero cold-side mass flow."
-        )
-
+        raise ValueError("Target hot outlet temperature cannot be achieved even at near-zero cold-side mass flow.")
     if high_result["T_h_out"] > target_hot_outlet_temp:
-        raise ValueError(
-            "Target hot outlet temperature is not reached within the allowed maximum cold-side flowrate."
-        )
+        raise ValueError("Target hot outlet temperature is not reached within the allowed maximum cold-side flowrate.")
 
     best_mc = low_mc
     best_result = low_result
@@ -214,7 +197,6 @@ def adjust_cold_mass_flow_to_constraints(
         mid_mc = 0.5 * (low_mc + high_mc)
         mid_result = solve_known_mc(thi, tci, mh, mid_mc, cph, cpc, u, area)
         tho_mid = mid_result["T_h_out"]
-
         best_mc = mid_mc
         best_result = mid_result
 
@@ -239,7 +221,6 @@ def render_source_inputs(source_num, defaults):
             value=defaults["thi"],
             key=f"src_thi_{source_num}"
         )
-
         mh = st.number_input(
             f"Hot mass flow (kg/s) - Source {source_num}",
             min_value=0.0001,
@@ -257,7 +238,6 @@ def render_source_inputs(source_num, defaults):
             step=10.0,
             key=f"src_cph_{source_num}"
         )
-
         h_hot = st.number_input(
             f"h_hot (W/m²-K) - Source {source_num}",
             min_value=0.0001,
@@ -266,12 +246,7 @@ def render_source_inputs(source_num, defaults):
             key=f"src_h_hot_{source_num}"
         )
 
-    return {
-        "thi": thi,
-        "mh": mh,
-        "cph": cph,
-        "h_hot": h_hot,
-    }
+    return {"thi": thi, "mh": mh, "cph": cph, "h_hot": h_hot}
 
 
 def render_sink_inputs(sink_num, defaults):
@@ -284,7 +259,6 @@ def render_sink_inputs(sink_num, defaults):
             value=defaults["tci"],
             key=f"snk_tci_{sink_num}"
         )
-
         mc = st.number_input(
             f"Cold mass flow (kg/s) - Sink {sink_num}",
             min_value=0.0001,
@@ -302,7 +276,6 @@ def render_sink_inputs(sink_num, defaults):
             step=10.0,
             key=f"snk_cpc_{sink_num}"
         )
-
         h_cold = st.number_input(
             f"h_cold (W/m²-K) - Sink {sink_num}",
             min_value=0.0001,
@@ -322,14 +295,7 @@ def render_sink_inputs(sink_num, defaults):
         )
 
     st.caption(f"Head fixed at {PUMP_HEAD_M:.1f} m, motor efficiency fixed at {MOTOR_EFFICIENCY:.2f}")
-
-    return {
-        "tci": tci,
-        "mc": mc,
-        "cpc": cpc,
-        "h_cold": h_cold,
-        "pump_eff": pump_eff,
-    }
+    return {"tci": tci, "mc": mc, "cpc": cpc, "h_cold": h_cold, "pump_eff": pump_eff}
 
 
 def render_exchanger_inputs(hx_num, defaults):
@@ -344,7 +310,6 @@ def render_exchanger_inputs(hx_num, defaults):
             step=0.1,
             key=f"hx_area_{hx_num}"
         )
-
         tube_thickness = st.number_input(
             f"Tube thickness, t (m) - HX {hx_num}",
             min_value=0.000001,
@@ -353,7 +318,6 @@ def render_exchanger_inputs(hx_num, defaults):
             format="%.6f",
             key=f"hx_tube_thickness_{hx_num}"
         )
-
         tube_k = st.number_input(
             f"Tube thermal conductivity, k (W/m-K) - HX {hx_num}",
             min_value=0.0001,
@@ -368,7 +332,6 @@ def render_exchanger_inputs(hx_num, defaults):
             ["Floating head", "Fixed head", "U-tube", "Kettle reboiler"],
             key=f"hx_exchanger_type_{hx_num}"
         )
-
         material = st.selectbox(
             f"Material - HX {hx_num}",
             [
@@ -385,7 +348,6 @@ def render_exchanger_inputs(hx_num, defaults):
             ["Up to 700 kPag (base)", "700–2100 kPag", "2100–4200 kPag", "4200–6200 kPag"],
             key=f"hx_pressure_band_{hx_num}"
         )
-
         ci_base = st.number_input(
             f"Base cost index - HX {hx_num}",
             min_value=0.0001,
@@ -393,7 +355,6 @@ def render_exchanger_inputs(hx_num, defaults):
             step=1.0,
             key=f"hx_ci_base_{hx_num}"
         )
-
         ci_calc = st.number_input(
             f"Calculation-year cost index - HX {hx_num}",
             min_value=0.0001,
@@ -419,24 +380,20 @@ def render_pairing_diagram(df_pairs, title):
         return
 
     y_map = {
-        "Source 1": 4, "Source 2": 3, "Source 3": 2, "Source 4": 1,
-        "Sink 1": 4, "Sink 2": 3, "Sink 3": 2, "Sink 4": 1,
+        "Source 1": 4,
+        "Source 2": 3,
+        "Source 3": 2,
+        "Source 4": 1,
+        "Sink 1": 4,
+        "Sink 2": 3,
+        "Sink 3": 2,
+        "Sink 4": 1,
     }
 
     node_rows = []
     for i in range(1, 5):
-        node_rows.append({
-            "label": f"Heat\nSource\n{i}",
-            "x": 0,
-            "y": y_map[f"Source {i}"],
-            "group": "source"
-        })
-        node_rows.append({
-            "label": f"Heat Sink\n{i}",
-            "x": 10,
-            "y": y_map[f"Sink {i}"],
-            "group": "sink"
-        })
+        node_rows.append({"label": f"Heat Source\n{i}", "name": f"Source {i}", "x": 0.7, "y": y_map[f"Source {i}"]})
+        node_rows.append({"label": f"Heat Sink\n{i}", "name": f"Sink {i}", "x": 9.3, "y": y_map[f"Sink {i}"]})
     nodes = pd.DataFrame(node_rows)
 
     line_rows = []
@@ -450,23 +407,18 @@ def render_pairing_diagram(df_pairs, title):
 
         y1 = y_map[src]
         y2 = y_map[snk]
+        mid1 = 3.3
+        mid2 = 6.7
 
-        line_rows.append({
-            "x": 1.2,
-            "y": y1,
-            "x2": 8.8,
-            "y2": y2,
-            "source": src,
-            "sink": snk,
-            "hx": hx
-        })
+        line_rows.extend([
+            {"x": 1.75, "y": y1, "x2": mid1, "y2": y1, "source": src, "sink": snk, "hx": hx},
+            {"x": mid1, "y": y1, "x2": mid1, "y2": y2, "source": src, "sink": snk, "hx": hx},
+            {"x": mid1, "y": y2, "x2": mid2, "y2": y2, "source": src, "sink": snk, "hx": hx},
+            {"x": mid2, "y": y2, "x2": 8.25, "y2": y2, "source": src, "sink": snk, "hx": hx},
+        ])
 
         if hx:
-            label_rows.append({
-                "x": 5.0,
-                "y": (y1 + y2) / 2.0,
-                "label": hx
-            })
+            label_rows.append({"x": 5.0, "y": y2 + 0.13, "label": hx})
 
     if not line_rows:
         st.info("No valid source-sink pairs available to visualize.")
@@ -475,11 +427,8 @@ def render_pairing_diagram(df_pairs, title):
     lines = pd.DataFrame(line_rows)
     labels = pd.DataFrame(label_rows)
 
-    line_chart = alt.Chart(lines).mark_rule(
-        color="#2f6f9f",
-        strokeWidth=3
-    ).encode(
-        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[-1, 11])),
+    line_chart = alt.Chart(lines).mark_rule(color="#2f6f9f", strokeWidth=3).encode(
+        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[0, 10])),
         y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5])),
         x2="x2:Q",
         y2="y2:Q",
@@ -487,18 +436,18 @@ def render_pairing_diagram(df_pairs, title):
     )
 
     node_chart = alt.Chart(nodes).mark_circle(
-        size=10000,
+        size=13000,
         color="#2b638f",
         stroke="#17384f",
         strokeWidth=2
     ).encode(
-        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[-1, 11])),
+        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[0, 10])),
         y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5]))
     )
 
     node_text = alt.Chart(nodes).mark_text(
         color="white",
-        fontSize=16,
+        fontSize=15,
         fontWeight="bold",
         align="center",
         baseline="middle",
@@ -515,16 +464,15 @@ def render_pairing_diagram(df_pairs, title):
         hx_text = alt.Chart(labels).mark_text(
             color="#1f2933",
             fontSize=12,
-            fontWeight="bold",
-            dy=-10
+            fontWeight="bold"
         ).encode(
-            x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[-1, 11])),
+            x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[0, 10])),
             y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5])),
             text="label:N"
         )
         chart = chart + hx_text
 
-    chart = chart.properties(title=title, height=440).configure_view(stroke=None)
+    chart = chart.properties(title=title, height=460).configure_view(stroke=None)
     st.altair_chart(chart, use_container_width=True)
 
 
@@ -533,10 +481,7 @@ def reset_invalid_choice(widget_key, valid_options):
         del st.session_state[widget_key]
 
 
-tab1, tab2 = st.tabs([
-    "Single HX Design + Cost",
-    "Heat Integration Matching"
-])
+tab1, tab2 = st.tabs(["Single HX Design + Cost", "Heat Integration Matching"])
 
 with tab1:
     st.header("Heat Exchanger Design + Cost")
@@ -562,14 +507,7 @@ with tab1:
         t1, t2 = st.columns(2)
 
         with t1:
-            tube_thickness = st.number_input(
-                "Tube Thickness, t (m)",
-                min_value=0.000001,
-                value=0.001,
-                step=0.0001,
-                format="%.6f"
-            )
-
+            tube_thickness = st.number_input("Tube Thickness, t (m)", min_value=0.000001, value=0.001, step=0.0001, format="%.6f")
         with t2:
             tube_k = st.number_input("Tube Therm Cond, k (W/m-K)", min_value=0.0001, value=15.0, step=0.5)
 
@@ -578,7 +516,6 @@ with tab1:
 
         with p1:
             cph = st.number_input("Hot Fluid Specific Heat, c_p,h (J/kg-K)", min_value=1.0, value=2200.0, step=10.0)
-
         with p2:
             cpc = st.number_input("Cold Fluid Specific Heat, c_p,c (Water) (J/kg-K)", min_value=1.0, value=4180.0, step=10.0)
 
@@ -586,21 +523,9 @@ with tab1:
         pp1, pp2 = st.columns(2)
 
         with pp1:
-            cold_pump_eff = st.number_input(
-                "Cold-side pump efficiency (0–1, head = 1 m)",
-                min_value=0.01,
-                max_value=1.0,
-                value=0.70,
-                step=0.01
-            )
-
+            cold_pump_eff = st.number_input("Cold-side pump efficiency (0–1, head = 1 m)", min_value=0.01, max_value=1.0, value=0.70, step=0.01)
         with pp2:
-            hours_per_year = st.number_input(
-                "Operating hours per year (h/yr)",
-                min_value=0.0,
-                value=8000.0,
-                step=100.0
-            )
+            hours_per_year = st.number_input("Operating hours per year (h/yr)", min_value=0.0, value=8000.0, step=100.0)
 
         st.caption(
             f"Electricity cost fixed at ${ELECTRICITY_COST_PER_KWH:.4f}/kWh, "
@@ -613,28 +538,14 @@ with tab1:
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            exchanger_type = st.selectbox(
-                "Exchanger type",
-                ["Floating head", "Fixed head", "U-tube", "Kettle reboiler"]
-            )
-
+            exchanger_type = st.selectbox("Exchanger type", ["Floating head", "Fixed head", "U-tube", "Kettle reboiler"])
             material = st.selectbox(
                 "Material of construction",
-                [
-                    "Carbon steel (base)", "SS304", "SS316", "SS347",
-                    "Nickel 200", "Monel 400", "Inconel 600",
-                    "Incoloy 825", "Titanium", "Hastelloy"
-                ]
+                ["Carbon steel (base)", "SS304", "SS316", "SS347", "Nickel 200", "Monel 400", "Inconel 600", "Incoloy 825", "Titanium", "Hastelloy"]
             )
-
         with c2:
-            pressure_band = st.selectbox(
-                "Design pressure band",
-                ["Up to 700 kPag (base)", "700–2100 kPag", "2100–4200 kPag", "4200–6200 kPag"]
-            )
-
+            pressure_band = st.selectbox("Design pressure band", ["Up to 700 kPag (base)", "700–2100 kPag", "2100–4200 kPag", "4200–6200 kPag"])
             ci_base = st.number_input("Base cost index", min_value=0.0001, value=500.0, step=1.0)
-
         with c3:
             ci_calc = st.number_input("Calculation-year cost index", min_value=0.0001, value=800.0, step=1.0)
 
@@ -652,30 +563,15 @@ with tab1:
                     st.error("Pump efficiency must be greater than zero.")
                 else:
                     u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
-
                     rows = []
                     for i in range(10):
                         iter_area = area * (1.2 ** i)
                         result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, iter_area)
-                        cost = calculate_shell_tube_cost(
-                            iter_area,
-                            exchanger_type,
-                            pressure_band,
-                            material,
-                            ci_base,
-                            ci_calc
-                        )
-
+                        cost = calculate_shell_tube_cost(iter_area, exchanger_type, pressure_band, material, ci_base, ci_calc)
                         hx_capital = cost["updated_cost"]
-                        pump_cost_year = pumping_cost_per_year(
-                            mc=mc,
-                            pump_eff=cold_pump_eff,
-                            hours_per_year=hours_per_year
-                        )
-
+                        pump_cost_year = pumping_cost_per_year(mc=mc, pump_eff=cold_pump_eff, hours_per_year=hours_per_year)
                         hx_annual = annualized_hx_cost(hx_capital)
                         tac = total_annual_cost(hx_capital, pump_cost_year)
-
                         rows.append({
                             "Iteration": i + 1,
                             "Area_m2": iter_area,
@@ -695,22 +591,11 @@ with tab1:
                         })
 
                     df = pd.DataFrame(rows)
-
                     st.subheader("Iteration table")
-                    df_display = df[
-                        [
-                            "Area_m2",
-                            "T_h_in_C",
-                            "T_h_out_C",
-                            "T_c_in_C",
-                            "T_c_out_C",
-                            "Q_kW",
-                            "HX_Cost_USD",
-                            "Pump_Cost_USD_per_year",
-                            "HX_Annualized_Cost_USD_per_year",
-                            "Total_Annual_Cost_USD_per_year",
-                        ]
-                    ].rename(columns={
+                    df_display = df[[
+                        "Area_m2", "T_h_in_C", "T_h_out_C", "T_c_in_C", "T_c_out_C", "Q_kW",
+                        "HX_Cost_USD", "Pump_Cost_USD_per_year", "HX_Annualized_Cost_USD_per_year", "Total_Annual_Cost_USD_per_year"
+                    ]].rename(columns={
                         "Area_m2": "Area (m²)",
                         "T_h_in_C": "Hot Inlet Temp (°C)",
                         "T_h_out_C": "Hot Outlet Temp (°C)",
@@ -725,12 +610,7 @@ with tab1:
 
                     styled_df = (
                         df_display.style
-                        .apply(
-                            style_temperature_cells,
-                            axis=None,
-                            min_hot_outlet_temp=min_hot_outlet_temp,
-                            max_cold_outlet_temp=max_cold_outlet_temp,
-                        )
+                        .apply(style_temperature_cells, axis=None, min_hot_outlet_temp=min_hot_outlet_temp, max_cold_outlet_temp=max_cold_outlet_temp)
                         .format({
                             "Area (m²)": "{:.4f}",
                             "Hot Inlet Temp (°C)": "{:.2f}",
@@ -744,21 +624,14 @@ with tab1:
                             "Total Annual Cost ($/yr)": "${:,.2f}",
                         })
                     )
-
                     st.dataframe(styled_df, use_container_width=True)
 
                     st.subheader("Minimum Cost Heat Exchanger Configuration")
-
-                    valid_mask = (
-                        (df["T_h_out_C"] >= min_hot_outlet_temp) &
-                        (df["T_c_out_C"] <= max_cold_outlet_temp)
-                    )
-
+                    valid_mask = (df["T_h_out_C"] >= min_hot_outlet_temp) & (df["T_c_out_C"] <= max_cold_outlet_temp)
                     valid_rows = df[valid_mask]
 
                     if not valid_rows.empty:
                         best_row = valid_rows.loc[valid_rows["Total_Annual_Cost_USD_per_year"].idxmin()]
-
                         result_data = pd.DataFrame({
                             "Parameter": [
                                 "Hot fluid inlet temperature (°C)",
@@ -783,79 +656,40 @@ with tab1:
                                 f"${best_row['Total_Annual_Cost_USD_per_year']:,.2f}"
                             ]
                         })
-
                         st.table(result_data)
                     else:
                         st.info("No feasible configuration satisfies the outlet-temperature constraints.")
 
                     st.subheader("Heat Exchanger Capital Cost vs Heat Duty")
-
                     base = alt.Chart(df).encode(
                         x=alt.X("Q_kW:Q", title="Heat Duty (kW)"),
                         y=alt.Y("HX_Cost_USD:Q", title="HX Capital Cost ($)")
                     )
-
-                    line = base.mark_line()
-                    points = base.mark_point(filled=True, size=80)
-
-                    chart = (line + points).interactive()
-                    st.altair_chart(chart, use_container_width=True)
+                    st.altair_chart((base.mark_line() + base.mark_point(filled=True, size=80)).interactive(), use_container_width=True)
 
                     st.subheader("Total Annual Cost vs Heat Duty")
-
                     base_tac = alt.Chart(df).encode(
                         x=alt.X("Q_kW:Q", title="Heat Duty (kW)"),
                         y=alt.Y("Total_Annual_Cost_USD_per_year:Q", title="Total Annual Cost ($/yr)")
                     )
-
-                    line_tac = base_tac.mark_line(color="#2E86AB")
-                    points_tac = base_tac.mark_point(filled=True, size=80, color="#2E86AB")
-
-                    chart_tac = (line_tac + points_tac).interactive()
-                    st.altair_chart(chart_tac, use_container_width=True)
-
-                    csv = df_display.to_csv(index=False).encode("utf-8")
+                    st.altair_chart((base_tac.mark_line(color="#2E86AB") + base_tac.mark_point(filled=True, size=80, color="#2E86AB")).interactive(), use_container_width=True)
 
             except Exception as e:
                 st.error(str(e))
 
 with tab2:
     st.header("Heat Integration Cost Optimization")
-    st.caption(
-        "Enter 4 heat sources, 4 heat sinks, and 4 heat exchangers, "
-        "then assign each source to one unique sink and one unique exchanger."
-    )
+    st.caption("Enter 4 heat sources, 4 heat sinks, and 4 heat exchangers, then assign each source to one unique sink and one unique exchanger.")
 
     st.markdown("## Global operating assumptions")
     go1, go2, go3, go4 = st.columns(4)
 
     with go1:
-        hours_per_year_global = st.number_input(
-            "Operating hours per year (h/yr)",
-            min_value=0.0,
-            value=8000.0,
-            step=100.0,
-            key="global_hours_per_year"
-        )
-
+        hours_per_year_global = st.number_input("Operating hours per year (h/yr)", min_value=0.0, value=8000.0, step=100.0, key="global_hours_per_year")
     with go2:
-        min_hot_outlet_temp_global = st.number_input(
-            "Minimum hot outlet temperature target (°C)",
-            value=60.0,
-            step=1.0,
-            key="global_min_hot_outlet_temp"
-        )
-
+        min_hot_outlet_temp_global = st.number_input("Minimum hot outlet temperature target (°C)", value=60.0, step=1.0, key="global_min_hot_outlet_temp")
     with go3:
-        max_cold_mass_flow_global = st.number_input(
-            "Maximum cold fluid flowrate (kg/s)",
-            min_value=0.0001,
-            value=5.0,
-            step=0.1,
-            format="%.4f",
-            key="global_max_cold_mass_flow"
-        )
-
+        max_cold_mass_flow_global = st.number_input("Maximum cold fluid flowrate (kg/s)", min_value=0.0001, value=5.0, step=0.1, format="%.4f", key="global_max_cold_mass_flow")
     with go4:
         st.caption(
             f"Electricity cost fixed at ${ELECTRICITY_COST_PER_KWH:.4f}/kWh, "
@@ -864,28 +698,9 @@ with tab2:
             f"HX life fixed at {int(HX_LIFE_YEARS)} years."
         )
 
-    source_defaults = {
-        "thi": 120.0,
-        "mh": 1.2,
-        "cph": 2200.0,
-        "h_hot": 1000.0,
-    }
-
-    sink_defaults = {
-        "tci": 25.0,
-        "mc": 1.0,
-        "cpc": 4180.0,
-        "h_cold": 1500.0,
-        "pump_eff": 0.70,
-    }
-
-    hx_defaults = {
-        "area": 20.0,
-        "tube_thickness": 0.001,
-        "tube_k": 15.0,
-        "ci_base": 500.0,
-        "ci_calc": 800.0,
-    }
+    source_defaults = {"thi": 120.0, "mh": 1.2, "cph": 2200.0, "h_hot": 1000.0}
+    sink_defaults = {"tci": 25.0, "mc": 1.0, "cpc": 4180.0, "h_cold": 1500.0, "pump_eff": 0.70}
+    hx_defaults = {"area": 20.0, "tube_thickness": 0.001, "tube_k": 15.0, "ci_base": 500.0, "ci_calc": 800.0}
 
     if "matched_results_df" not in st.session_state:
         st.session_state.matched_results_df = None
@@ -933,50 +748,34 @@ with tab2:
             exchangers.append(render_exchanger_inputs(i, hx_defaults))
 
     st.markdown("## Assign sinks and exchangers to each source")
-
     sink_labels = [f"Sink {i}" for i in range(1, 5)]
     hx_labels = [f"HX {i}" for i in range(1, 5)]
-
     selected_sinks = []
     selected_hx = []
 
     for i in range(1, 5):
         st.markdown(f"### Matching for Source {i}")
         c1, c2 = st.columns(2)
-
         remaining_sinks = [s for s in sink_labels if s not in selected_sinks]
         remaining_hx = [h for h in hx_labels if h not in selected_hx]
-
         sink_key = f"match_sink_{i}"
         hx_key = f"match_hx_{i}"
-
         reset_invalid_choice(sink_key, remaining_sinks)
         reset_invalid_choice(hx_key, remaining_hx)
 
         with c1:
-            sink_choice = st.selectbox(
-                f"Choose sink for Source {i}",
-                options=remaining_sinks,
-                key=sink_key
-            )
+            sink_choice = st.selectbox(f"Choose sink for Source {i}", options=remaining_sinks, key=sink_key)
         selected_sinks.append(sink_choice)
 
         remaining_hx = [h for h in hx_labels if h not in selected_hx]
         reset_invalid_choice(hx_key, remaining_hx)
-
         with c2:
-            hx_choice = st.selectbox(
-                f"Choose exchanger for Source {i}",
-                options=remaining_hx,
-                key=hx_key
-            )
+            hx_choice = st.selectbox(f"Choose exchanger for Source {i}", options=remaining_hx, key=hx_key)
         selected_hx.append(hx_choice)
 
     calculate = st.button("Click to calculate results for selected pairs")
-
     if calculate:
         results_rows = []
-
         sink_index_map = {f"Sink {i}": i - 1 for i in range(1, 5)}
         hx_index_map = {f"HX {i}": i - 1 for i in range(1, 5)}
 
@@ -989,59 +788,22 @@ with tab2:
                 source = sources[i - 1]
                 sink = sinks[sink_index_map[selected_sinks[i - 1]]]
                 hx = exchangers[hx_index_map[selected_hx[i - 1]]]
-
                 try:
                     if source["thi"] <= sink["tci"]:
-                        st.error(
-                            f"Source {i}: hot inlet temperature must be greater "
-                            f"than the selected sink cold inlet temperature."
-                        )
+                        st.error(f"Source {i}: hot inlet temperature must be greater than the selected sink cold inlet temperature.")
                         continue
-
                     if hx["area"] <= 0:
                         st.error(f"Source {i}: exchanger area must be greater than zero.")
                         continue
-
-                    if (
-                        source["h_hot"] <= 0
-                        or sink["h_cold"] <= 0
-                        or hx["tube_thickness"] <= 0
-                        or hx["tube_k"] <= 0
-                        or sink["pump_eff"] <= 0
-                    ):
+                    if source["h_hot"] <= 0 or sink["h_cold"] <= 0 or hx["tube_thickness"] <= 0 or hx["tube_k"] <= 0 or sink["pump_eff"] <= 0:
                         st.error(f"Source {i}: invalid heat-transfer, tube-property, or pump input.")
                         continue
 
-                    u = calculate_overall_u(
-                        source["h_hot"],
-                        sink["h_cold"],
-                        hx["tube_thickness"],
-                        hx["tube_k"]
-                    )
-
-                    result = solve_known_mc(
-                        source["thi"], sink["tci"],
-                        source["mh"], sink["mc"],
-                        source["cph"], sink["cpc"],
-                        u, hx["area"]
-                    )
-
-                    cost = calculate_shell_tube_cost(
-                        hx["area"],
-                        hx["exchanger_type"],
-                        hx["pressure_band"],
-                        hx["material"],
-                        hx["ci_base"],
-                        hx["ci_calc"]
-                    )
-
+                    u = calculate_overall_u(source["h_hot"], sink["h_cold"], hx["tube_thickness"], hx["tube_k"])
+                    result = solve_known_mc(source["thi"], sink["tci"], source["mh"], sink["mc"], source["cph"], sink["cpc"], u, hx["area"])
+                    cost = calculate_shell_tube_cost(hx["area"], hx["exchanger_type"], hx["pressure_band"], hx["material"], hx["ci_base"], hx["ci_calc"])
                     hx_capital = cost["updated_cost"]
-                    pump_cost_year = pumping_cost_per_year(
-                        mc=sink["mc"],
-                        pump_eff=sink["pump_eff"],
-                        hours_per_year=hours_per_year_global
-                    )
-
+                    pump_cost_year = pumping_cost_per_year(mc=sink["mc"], pump_eff=sink["pump_eff"], hours_per_year=hours_per_year_global)
                     hx_annual = annualized_hx_cost(hx_capital)
                     tac = total_annual_cost(hx_capital, pump_cost_year)
 
@@ -1065,7 +827,6 @@ with tab2:
                         "HX annual numeric": hx_annual,
                         "Total annual numeric": tac,
                     })
-
                 except Exception as e:
                     st.error(f"Source {i}: {str(e)}")
 
@@ -1075,18 +836,9 @@ with tab2:
                 st.session_state.matched_total_heat_duty = results_df["Heat duty numeric"].sum()
                 st.session_state.matched_total_pump_cost = results_df["Pump cost numeric"].sum()
                 st.session_state.matched_total_annual_cost = results_df["Total annual numeric"].sum()
-                st.session_state.matched_results_df = results_df.drop(
-                    columns=[
-                        "HX capital numeric",
-                        "Heat duty numeric",
-                        "Pump cost numeric",
-                        "HX annual numeric",
-                        "Total annual numeric"
-                    ]
-                )
+                st.session_state.matched_results_df = results_df.drop(columns=["HX capital numeric", "Heat duty numeric", "Pump cost numeric", "HX annual numeric", "Total annual numeric"])
 
     optimize = st.button("Click to optimize pairs for maximum heat integration", type="secondary")
-
     st.markdown("## Results")
 
     if optimize:
@@ -1114,78 +866,32 @@ with tab2:
                     source = sources[i]
                     sink = sinks[sink_perm[i]]
                     hx = exchangers[hx_perm[i]]
-
                     try:
-                        if source["thi"] <= sink["tci"]:
+                        if source["thi"] <= sink["tci"] or hx["area"] <= 0:
+                            feasible = False
+                            break
+                        if source["h_hot"] <= 0 or sink["h_cold"] <= 0 or hx["tube_thickness"] <= 0 or hx["tube_k"] <= 0 or sink["pump_eff"] <= 0:
                             feasible = False
                             break
 
-                        if hx["area"] <= 0:
-                            feasible = False
-                            break
-
-                        if (
-                            source["h_hot"] <= 0
-                            or sink["h_cold"] <= 0
-                            or hx["tube_thickness"] <= 0
-                            or hx["tube_k"] <= 0
-                            or sink["pump_eff"] <= 0
-                        ):
-                            feasible = False
-                            break
-
-                        u = calculate_overall_u(
-                            source["h_hot"],
-                            sink["h_cold"],
-                            hx["tube_thickness"],
-                            hx["tube_k"]
-                        )
-
-                        result = solve_known_mc(
-                            source["thi"], sink["tci"],
-                            source["mh"], sink["mc"],
-                            source["cph"], sink["cpc"],
-                            u, hx["area"]
-                        )
-
-                        cost = calculate_shell_tube_cost(
-                            hx["area"],
-                            hx["exchanger_type"],
-                            hx["pressure_band"],
-                            hx["material"],
-                            hx["ci_base"],
-                            hx["ci_calc"]
-                        )
-
+                        u = calculate_overall_u(source["h_hot"], sink["h_cold"], hx["tube_thickness"], hx["tube_k"])
+                        result = solve_known_mc(source["thi"], sink["tci"], source["mh"], sink["mc"], source["cph"], sink["cpc"], u, hx["area"])
+                        cost = calculate_shell_tube_cost(hx["area"], hx["exchanger_type"], hx["pressure_band"], hx["material"], hx["ci_base"], hx["ci_calc"])
                         hx_capital = cost["updated_cost"]
-                        pump_cost_year = pumping_cost_per_year(
-                            mc=sink["mc"],
-                            pump_eff=sink["pump_eff"],
-                            hours_per_year=hours_per_year_global
-                        )
-
+                        pump_cost_year = pumping_cost_per_year(mc=sink["mc"], pump_eff=sink["pump_eff"], hours_per_year=hours_per_year_global)
                         tac = total_annual_cost(hx_capital, pump_cost_year)
 
                         current_total_capital += hx_capital
                         current_total_pump_cost += pump_cost_year
                         current_total_annual_cost += tac
                         current_total_q += result["Q_kW"]
-
                     except Exception:
                         feasible = False
                         break
 
                 if feasible:
                     feasible_count += 1
-
-                    if (
-                        best_solution is None
-                        or current_total_q > best_total_q
-                        or (
-                            abs(current_total_q - best_total_q) < 1e-9
-                            and current_total_annual_cost < best_total_annual_cost
-                        )
-                    ):
+                    if best_solution is None or current_total_q > best_total_q or (abs(current_total_q - best_total_q) < 1e-9 and current_total_annual_cost < best_total_annual_cost):
                         best_solution = True
                         best_total_capital = current_total_capital
                         best_total_pump_cost = current_total_pump_cost
@@ -1206,15 +912,8 @@ with tab2:
                 source = sources[i]
                 sink = sinks[best_sink_perm[i]]
                 hx = exchangers[best_hx_perm[i]]
-
                 try:
-                    u = calculate_overall_u(
-                        source["h_hot"],
-                        sink["h_cold"],
-                        hx["tube_thickness"],
-                        hx["tube_k"]
-                    )
-
+                    u = calculate_overall_u(source["h_hot"], sink["h_cold"], hx["tube_thickness"], hx["tube_k"])
                     adjusted_mc, adjusted_result, converged = adjust_cold_mass_flow_to_constraints(
                         thi=source["thi"],
                         tci=sink["tci"],
@@ -1226,23 +925,9 @@ with tab2:
                         target_hot_outlet_temp=min_hot_outlet_temp_global,
                         max_cold_mass_flow=max_cold_mass_flow_global
                     )
-
-                    cost = calculate_shell_tube_cost(
-                        hx["area"],
-                        hx["exchanger_type"],
-                        hx["pressure_band"],
-                        hx["material"],
-                        hx["ci_base"],
-                        hx["ci_calc"]
-                    )
-
+                    cost = calculate_shell_tube_cost(hx["area"], hx["exchanger_type"], hx["pressure_band"], hx["material"], hx["ci_base"], hx["ci_calc"])
                     hx_capital = cost["updated_cost"]
-                    pump_cost_year = pumping_cost_per_year(
-                        mc=adjusted_mc,
-                        pump_eff=sink["pump_eff"],
-                        hours_per_year=hours_per_year_global
-                    )
-
+                    pump_cost_year = pumping_cost_per_year(mc=adjusted_mc, pump_eff=sink["pump_eff"], hours_per_year=hours_per_year_global)
                     hx_annual = annualized_hx_cost(hx_capital)
                     tac = total_annual_cost(hx_capital, pump_cost_year)
 
@@ -1269,7 +954,6 @@ with tab2:
                         "Total Annual Cost ($/yr)": f"${tac:,.2f}",
                         "Constraint status": "Satisfied" if converged else "Approximate"
                     })
-
                 except Exception as e:
                     adjustment_possible_for_all = False
                     adjusted_rows.append({
@@ -1300,7 +984,6 @@ with tab2:
 
             if not adjustment_possible_for_all:
                 st.warning("Some optimized pairs could not satisfy both the minimum hot outlet temperature and maximum cold fluid flowrate constraints.")
-
         else:
             st.session_state.optimized_results_df = None
             st.session_state.optimized_total_capital = None
@@ -1312,6 +995,7 @@ with tab2:
     if st.session_state.matched_results_df is not None:
         st.subheader("Matched results")
         st.dataframe(st.session_state.matched_results_df, use_container_width=True)
+        st.markdown("### Matched pairs visual")
         render_pairing_diagram(st.session_state.matched_results_df, "Selected source-to-sink matches")
 
         c1, c2, c3, c4 = st.columns(4)
@@ -1327,6 +1011,7 @@ with tab2:
     if st.session_state.optimized_results_df is not None:
         st.subheader("Optimal matched results for maximum heat integration")
         st.dataframe(st.session_state.optimized_results_df, use_container_width=True)
+        st.markdown("### Optimized pairs visual")
         render_pairing_diagram(st.session_state.optimized_results_df, "Optimized source-to-sink matches")
 
         c1, c2, c3, c4 = st.columns(4)
@@ -1340,10 +1025,6 @@ with tab2:
             st.metric("Total annual cost of heat Integration", f"${st.session_state.optimized_total_annual_cost:,.2f}/yr")
 
         total_assignments = math.factorial(4) * math.factorial(4)
-        st.caption(
-            f"Feasible assignments found: {st.session_state.optimized_feasible_count} "
-            f"out of {total_assignments} total assignments checked."
-        )
-
+        st.caption(f"Feasible assignments found: {st.session_state.optimized_feasible_count} out of {total_assignments} total assignments checked.")
     elif optimize:
         st.warning("No feasible one-to-one assignment found for the given inputs.")
