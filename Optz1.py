@@ -9,6 +9,7 @@ st.set_page_config(
 )
 
 st.title("Heat Exchanger Design + Cost")
+st.caption("4 hot/cold stream pairs using the same heat exchanger design and cost basis.")
 
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
@@ -127,25 +128,18 @@ def calculate_shell_tube_cost(area_m2, exchanger_type, pressure_band, material, 
     }
 
 
-with st.form("hx_single_case_form"):
-    st.markdown("## Input values")
+NUM_PAIRS = 4
+
+with st.form("hx_multi_case_form"):
+    st.markdown("## Shared heat exchanger inputs")
     col1, col2 = st.columns(2)
 
     with col1:
-        thi = st.number_input("Hot Fluid Inlet Temperature (°C)", value=120.0)
-        tci = st.number_input("Initial Cold Fluid Temp (avg T of return water) (°C)", value=25.0)
-        mh = st.number_input("Mass Flow of Hot Fluid (kg/s)", min_value=0.0001, value=1.2, step=0.1, format="%.4f")
-        mc = st.number_input("Mass Flow of Cold Fluid (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
-
-    with col2:
         area = st.number_input("Value of HX area (m²)", min_value=0.0001, value=20.0, step=0.1)
         h_hot = st.number_input("HT Coeff of Hot Fluid, h_hot (W/m²-K)", min_value=0.0001, value=1000.0, step=10.0)
         h_cold = st.number_input("HT Coeff of Cold Fluid, h_cold (W/m²-K)", min_value=0.0001, value=1500.0, step=10.0)
 
-    st.markdown("## Tube properties")
-    t1, t2 = st.columns(2)
-
-    with t1:
+    with col2:
         tube_thickness = st.number_input(
             "Tube Thickness, t (m)",
             min_value=0.000001,
@@ -153,20 +147,9 @@ with st.form("hx_single_case_form"):
             step=0.0001,
             format="%.6f"
         )
-
-    with t2:
         tube_k = st.number_input("Tube Therm Cond, k (W/m-K)", min_value=0.0001, value=15.0, step=0.5)
 
-    st.markdown("## Fluid properties")
-    p1, p2 = st.columns(2)
-
-    with p1:
-        cph = st.number_input("Hot Fluid Specific Heat, c_p,h (J/kg-K)", min_value=1.0, value=2200.0, step=10.0)
-
-    with p2:
-        cpc = st.number_input("Cold Fluid Specific Heat, c_p,c (Water) (J/kg-K)", min_value=1.0, value=4180.0, step=10.0)
-
-    st.markdown("## Shell-and-tube cost inputs")
+    st.markdown("## Shared shell-and-tube cost inputs")
     c1, c2, c3 = st.columns(3)
 
     with c1:
@@ -193,20 +176,110 @@ with st.form("hx_single_case_form"):
     with c3:
         ci_calc = st.number_input("Calculation-year cost index", min_value=0.0001, value=800.0, step=1.0)
 
-    submitted = st.form_submit_button("Calculate")
+    st.markdown("## Inputs for 4 heat source-sink pairs")
+
+    pair_inputs = []
+    tabs = st.tabs([f"Pair {i}" for i in range(1, NUM_PAIRS + 1)])
+
+    default_values = [
+        {"thi": 120.0, "tci": 25.0, "mh": 1.2, "mc": 1.0, "cph": 2200.0, "cpc": 4180.0},
+        {"thi": 115.0, "tci": 25.0, "mh": 1.1, "mc": 1.0, "cph": 2200.0, "cpc": 4180.0},
+        {"thi": 110.0, "tci": 25.0, "mh": 1.0, "mc": 1.0, "cph": 2200.0, "cpc": 4180.0},
+        {"thi": 105.0, "tci": 25.0, "mh": 0.9, "mc": 1.0, "cph": 2200.0, "cpc": 4180.0},
+    ]
+
+    for i, tab in enumerate(tabs, start=1):
+        with tab:
+            st.markdown(f"### Pair {i}")
+            pcol1, pcol2 = st.columns(2)
+
+            with pcol1:
+                thi = st.number_input(
+                    f"Hot Fluid Inlet Temperature (°C) - Pair {i}",
+                    value=default_values[i - 1]["thi"],
+                    key=f"thi_{i}"
+                )
+                tci = st.number_input(
+                    f"Initial Cold Fluid Temp (°C) - Pair {i}",
+                    value=default_values[i - 1]["tci"],
+                    key=f"tci_{i}"
+                )
+                mh = st.number_input(
+                    f"Mass Flow of Hot Fluid (kg/s) - Pair {i}",
+                    min_value=0.0001,
+                    value=default_values[i - 1]["mh"],
+                    step=0.1,
+                    format="%.4f",
+                    key=f"mh_{i}"
+                )
+
+            with pcol2:
+                mc = st.number_input(
+                    f"Mass Flow of Cold Fluid (kg/s) - Pair {i}",
+                    min_value=0.0001,
+                    value=default_values[i - 1]["mc"],
+                    step=0.1,
+                    format="%.4f",
+                    key=f"mc_{i}"
+                )
+                cph = st.number_input(
+                    f"Hot Fluid Specific Heat, c_p,h (J/kg-K) - Pair {i}",
+                    min_value=1.0,
+                    value=default_values[i - 1]["cph"],
+                    step=10.0,
+                    key=f"cph_{i}"
+                )
+                cpc = st.number_input(
+                    f"Cold Fluid Specific Heat, c_p,c (J/kg-K) - Pair {i}",
+                    min_value=1.0,
+                    value=default_values[i - 1]["cpc"],
+                    step=10.0,
+                    key=f"cpc_{i}"
+                )
+
+            pair_inputs.append({
+                "pair": i,
+                "thi": thi,
+                "tci": tci,
+                "mh": mh,
+                "mc": mc,
+                "cph": cph,
+                "cpc": cpc
+            })
+
+    submitted = st.form_submit_button("Calculate all 4 pairs")
 
 
 if submitted:
     try:
-        if thi <= tci:
-            st.error("Hot inlet temperature must be greater than cold inlet temperature.")
-        elif area <= 0:
-            st.error("Heat exchanger area must be greater than zero.")
-        elif h_hot <= 0 or h_cold <= 0 or tube_thickness <= 0 or tube_k <= 0:
-            st.error("Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero.")
+        validation_errors = []
+
+        if area <= 0:
+            validation_errors.append("Heat exchanger area must be greater than zero.")
+        if h_hot <= 0 or h_cold <= 0 or tube_thickness <= 0 or tube_k <= 0:
+            validation_errors.append(
+                "Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero."
+            )
+
+        for pair in pair_inputs:
+            if pair["thi"] <= pair["tci"]:
+                validation_errors.append(
+                    f"Pair {pair['pair']}: Hot inlet temperature must be greater than cold inlet temperature."
+                )
+            if pair["mh"] <= 0 or pair["mc"] <= 0:
+                validation_errors.append(
+                    f"Pair {pair['pair']}: Mass flow rates must be greater than zero."
+                )
+            if pair["cph"] <= 0 or pair["cpc"] <= 0:
+                validation_errors.append(
+                    f"Pair {pair['pair']}: Specific heats must be greater than zero."
+                )
+
+        if validation_errors:
+            for err in validation_errors:
+                st.error(err)
         else:
             u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
-            result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
             cost = calculate_shell_tube_cost(
                 area,
                 exchanger_type,
@@ -216,24 +289,51 @@ if submitted:
                 ci_calc
             )
 
-            st.subheader("Results")
+            results_rows = []
 
-            result_data = pd.DataFrame({
+            for pair in pair_inputs:
+                result = solve_known_mc(
+                    pair["thi"],
+                    pair["tci"],
+                    pair["mh"],
+                    pair["mc"],
+                    pair["cph"],
+                    pair["cpc"],
+                    u,
+                    area
+                )
+
+                results_rows.append({
+                    "Pair": f"Pair {pair['pair']}",
+                    "Hot inlet (°C)": f"{pair['thi']:.2f}",
+                    "Cold inlet (°C)": f"{pair['tci']:.2f}",
+                    "Hot outlet (°C)": f"{result['T_h_out']:.2f}",
+                    "Cold outlet (°C)": f"{result['T_c_out']:.2f}",
+                    "Heat duty (kW)": f"{result['Q_kW']:.4f}",
+                    "UA (W/K)": f"{result['UA']:.2f}",
+                    "NTU": f"{result['NTU']:.4f}",
+                    "Effectiveness": f"{result['Effectiveness']:.4f}",
+                })
+
+            results_df = pd.DataFrame(results_rows)
+
+            st.subheader("Results for all 4 pairs")
+            st.table(results_df)
+
+            st.subheader("Shared heat exchanger summary")
+            shared_df = pd.DataFrame({
                 "Parameter": [
-                    "Hot fluid outlet temperature (°C)",
-                    "Cold fluid outlet temperature (°C)",
-                    "Heat extracted / Heat duty (kW)",
-                    "Heat Exchanger cost ($)"
+                    "Overall heat transfer coefficient, U (W/m²-K)",
+                    "Heat exchanger area (m²)",
+                    "Shared exchanger cost ($)"
                 ],
                 "Value": [
-                    f"{result['T_h_out']:.2f}",
-                    f"{result['T_c_out']:.2f}",
-                    f"{result['Q_kW']:.4f}",
+                    f"{u:.2f}",
+                    f"{area:.2f}",
                     f"${cost['updated_cost']:,.2f}"
                 ]
             })
-
-            st.table(result_data)
+            st.table(shared_df)
 
     except Exception as e:
         st.error(str(e))
