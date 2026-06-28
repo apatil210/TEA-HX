@@ -178,37 +178,34 @@ def style_temperature_cells(df_in, min_hot_outlet_temp, max_cold_outlet_temp):
     return styles
 
 
-def adjust_cold_mass_flow_to_hot_target(
+def adjust_cold_mass_flow_to_constraints(
     thi, tci, mh, cph, cpc, u, area,
     target_hot_outlet_temp,
-    initial_mc,
+    max_cold_mass_flow,
     tol=1e-3,
     max_iter=100
 ):
     if target_hot_outlet_temp >= thi:
         raise ValueError("Minimum hot outlet target must be less than hot inlet temperature.")
 
+    if max_cold_mass_flow <= 0:
+        raise ValueError("Maximum cold fluid flowrate must be greater than zero.")
+
     low_mc = 1e-6
-    high_mc = max(initial_mc, 1e-6)
+    high_mc = max_cold_mass_flow
 
     low_result = solve_known_mc(thi, tci, mh, low_mc, cph, cpc, u, area)
+    high_result = solve_known_mc(thi, tci, mh, high_mc, cph, cpc, u, area)
+
     if low_result["T_h_out"] < target_hot_outlet_temp:
         raise ValueError(
             "Target hot outlet temperature cannot be achieved even at near-zero cold-side mass flow."
         )
 
-    high_result = solve_known_mc(thi, tci, mh, high_mc, cph, cpc, u, area)
-
-    expand_counter = 0
-    while high_result["T_h_out"] > target_hot_outlet_temp and expand_counter < 60:
-        high_mc *= 2.0
-        high_result = solve_known_mc(thi, tci, mh, high_mc, cph, cpc, u, area)
-        expand_counter += 1
-
     if high_result["T_h_out"] > target_hot_outlet_temp:
-        adjusted_mc = high_mc
-        adjusted_result = high_result
-        return adjusted_mc, adjusted_result, False
+        raise ValueError(
+            "Target hot outlet temperature is not reached within the allowed maximum cold-side flowrate."
+        )
 
     best_mc = low_mc
     best_result = low_result
@@ -722,7 +719,7 @@ with tab2:
     )
 
     st.markdown("## Global operating assumptions")
-    go1, go2, go3 = st.columns(3)
+    go1, go2, go3, go4 = st.columns(4)
 
     with go1:
         hours_per_year_global = st.number_input(
@@ -742,6 +739,16 @@ with tab2:
         )
 
     with go3:
+        max_cold_mass_flow_global = st.number_input(
+            "Maximum cold fluid flowrate (kg/s)",
+            min_value=0.0001,
+            value=5.0,
+            step=0.1,
+            format="%.4f",
+            key="global_max_cold_mass_flow"
+        )
+
+    with go4:
         st.caption(
             f"Electricity cost fixed at ${ELECTRICITY_COST_PER_KWH:.4f}/kWh, "
             f"motor efficiency fixed at {MOTOR_EFFICIENCY:.2f}, "
@@ -989,7 +996,6 @@ with tab2:
 
         for sink_perm in sink_permutations:
             for hx_perm in hx_permutations:
-                current_rows = []
                 current_total_capital = 0.0
                 current_total_pump_cost = 0.0
                 current_total_annual_cost = 0.0
@@ -1050,29 +1056,12 @@ with tab2:
                             hours_per_year=hours_per_year_global
                         )
 
-                        hx_annual = annualized_hx_cost(hx_capital)
                         tac = total_annual_cost(hx_capital, pump_cost_year)
 
                         current_total_capital += hx_capital
                         current_total_pump_cost += pump_cost_year
                         current_total_annual_cost += tac
                         current_total_q += result["Q_kW"]
-
-                        current_rows.append({
-                            "Source": f"Source {i + 1}",
-                            "Sink": f"Sink {sink_perm[i] + 1}",
-                            "Exchanger": f"HX {hx_perm[i] + 1}",
-                            "Hot outlet temp (°C)": f"{result['T_h_out']:.2f}",
-                            "Cold outlet temp (°C)": f"{result['T_c_out']:.2f}",
-                            "Heat duty (kW)": f"{result['Q_kW']:.4f}",
-                            "Overall U (W/m²-K)": f"{u:.2f}",
-                            "NTU": f"{result['NTU']:.4f}",
-                            "Effectiveness": f"{result['Effectiveness']:.4f}",
-                            "HX Capital Cost ($)": f"${hx_capital:,.2f}",
-                            "Pump Operating Cost ($/yr)": f"${pump_cost_year:,.2f}",
-                            "HX Annualized Cost ($/yr)": f"${hx_annual:,.2f}",
-                            "Total Annual Cost ($/yr)": f"${tac:,.2f}",
-                        })
 
                     except Exception:
                         feasible = False
@@ -1089,7 +1078,7 @@ with tab2:
                             and current_total_annual_cost < best_total_annual_cost
                         )
                     ):
-                        best_solution = current_rows
+                        best_solution = True
                         best_total_capital = current_total_capital
                         best_total_pump_cost = current_total_pump_cost
                         best_total_annual_cost = current_total_annual_cost
@@ -1103,7 +1092,6 @@ with tab2:
             adjusted_total_pump_cost = 0.0
             adjusted_total_annual_cost = 0.0
             adjusted_total_q = 0.0
-
             adjustment_possible_for_all = True
 
             for i in range(4):
@@ -1119,7 +1107,7 @@ with tab2:
                         hx["tube_k"]
                     )
 
-                    adjusted_mc, adjusted_result, converged = adjust_cold_mass_flow_to_hot_target(
+                    adjusted_mc, adjusted_result, converged = adjust_cold_mass_flow_to_constraints(
                         thi=source["thi"],
                         tci=sink["tci"],
                         mh=source["mh"],
@@ -1128,7 +1116,7 @@ with tab2:
                         u=u,
                         area=hx["area"],
                         target_hot_outlet_temp=min_hot_outlet_temp_global,
-                        initial_mc=sink["mc"]
+                        max_cold_mass_flow=max_cold_mass_flow_global
                     )
 
                     cost = calculate_shell_tube_cost(
@@ -1159,8 +1147,8 @@ with tab2:
                         "Source": f"Source {i + 1}",
                         "Sink": f"Sink {best_sink_perm[i] + 1}",
                         "Exchanger": f"HX {best_hx_perm[i] + 1}",
-                        "Original cold mass flow (kg/s)": f"{sink['mc']:.4f}",
                         "Adjusted cold mass flow (kg/s)": f"{adjusted_mc:.4f}",
+                        "Maximum allowed cold mass flow (kg/s)": f"{max_cold_mass_flow_global:.4f}",
                         "Hot outlet temp (°C)": f"{adjusted_result['T_h_out']:.2f}",
                         "Cold outlet temp (°C)": f"{adjusted_result['T_c_out']:.2f}",
                         "Heat duty (kW)": f"{adjusted_result['Q_kW']:.4f}",
@@ -1171,27 +1159,40 @@ with tab2:
                         "Pump Operating Cost ($/yr)": f"${pump_cost_year:,.2f}",
                         "HX Annualized Cost ($/yr)": f"${hx_annual:,.2f}",
                         "Total Annual Cost ($/yr)": f"${tac:,.2f}",
-                        "Adjustment converged": "Yes" if converged else "No",
+                        "Constraint status": "Satisfied" if converged else "Approximate"
                     })
 
                 except Exception as e:
                     adjustment_possible_for_all = False
-                    st.error(f"Adjustment failed for Source {i + 1}: {str(e)}")
+                    adjusted_rows.append({
+                        "Source": f"Source {i + 1}",
+                        "Sink": f"Sink {best_sink_perm[i] + 1}",
+                        "Exchanger": f"HX {best_hx_perm[i] + 1}",
+                        "Adjusted cold mass flow (kg/s)": "N/A",
+                        "Maximum allowed cold mass flow (kg/s)": f"{max_cold_mass_flow_global:.4f}",
+                        "Hot outlet temp (°C)": "N/A",
+                        "Cold outlet temp (°C)": "N/A",
+                        "Heat duty (kW)": "N/A",
+                        "Overall U (W/m²-K)": "N/A",
+                        "NTU": "N/A",
+                        "Effectiveness": "N/A",
+                        "HX Capital Cost ($)": "N/A",
+                        "Pump Operating Cost ($/yr)": "N/A",
+                        "HX Annualized Cost ($/yr)": "N/A",
+                        "Total Annual Cost ($/yr)": "N/A",
+                        "Constraint status": f"Not satisfied: {str(e)}"
+                    })
 
-            if adjustment_possible_for_all and adjusted_rows:
-                st.session_state.optimized_results_df = pd.DataFrame(adjusted_rows)
-                st.session_state.optimized_total_capital = adjusted_total_capital
-                st.session_state.optimized_total_pump_cost = adjusted_total_pump_cost
-                st.session_state.optimized_total_annual_cost = adjusted_total_annual_cost
-                st.session_state.optimized_total_q = adjusted_total_q
-                st.session_state.optimized_feasible_count = feasible_count
-            else:
-                st.session_state.optimized_results_df = None
-                st.session_state.optimized_total_capital = None
-                st.session_state.optimized_total_pump_cost = None
-                st.session_state.optimized_total_annual_cost = None
-                st.session_state.optimized_total_q = None
-                st.session_state.optimized_feasible_count = feasible_count
+            st.session_state.optimized_results_df = pd.DataFrame(adjusted_rows)
+            st.session_state.optimized_total_capital = adjusted_total_capital
+            st.session_state.optimized_total_pump_cost = adjusted_total_pump_cost
+            st.session_state.optimized_total_annual_cost = adjusted_total_annual_cost
+            st.session_state.optimized_total_q = adjusted_total_q
+            st.session_state.optimized_feasible_count = feasible_count
+
+            if not adjustment_possible_for_all:
+                st.warning("Some optimized pairs could not satisfy both the minimum hot outlet temperature and maximum cold fluid flowrate constraints.")
+
         else:
             st.session_state.optimized_results_df = None
             st.session_state.optimized_total_capital = None
@@ -1215,12 +1216,12 @@ with tab2:
             st.metric("Total heat integration", f"{st.session_state.matched_total_heat_duty:.4f} kW")
 
     if st.session_state.optimized_results_df is not None:
-        st.subheader("Optimal matched results after cold-flow adjustment to satisfy minimum hot outlet temperature")
+        st.subheader("Optimal matched results for maximum heat integration")
         st.dataframe(st.session_state.optimized_results_df, use_container_width=True)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            st.metric("Adjusted total heat integration", f"{st.session_state.optimized_total_q:.4f} kW")
+            st.metric("Maximum total heat integration", f"{st.session_state.optimized_total_q:.4f} kW")
         with c2:
             st.metric("Total HX capital", f"${st.session_state.optimized_total_capital:,.2f}")
         with c3:
