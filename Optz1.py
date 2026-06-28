@@ -461,12 +461,20 @@ if calculate:
                     "NTU": f"{result['NTU']:.4f}",
                     "Effectiveness": f"{result['Effectiveness']:.4f}",
                     "HX cost ($)": f"${cost['updated_cost']:,.2f}",
+                    "HX cost numeric": cost["updated_cost"],
                 })
 
             except Exception as e:
                 st.error(f"Source {i}: {str(e)}")
 
     if results_rows:
-        st.subheader("Matched results")
         results_df = pd.DataFrame(results_rows)
-        st.dataframe(results_df, use_container_width=True)
+        total_cost = results_df["HX cost numeric"].sum()
+
+        display_df = results_df.drop(columns=["HX cost numeric"])
+
+        st.subheader("Matched results")
+        st.dataframe(display_df, use_container_width=True)
+
+        st.markdown("## 5) Total cost of heat integration")
+        st.metric("Total cost of heat integration", f"${total_cost:,.2f}")
