@@ -13,6 +13,13 @@ st.set_page_config(
 st.title("Heat Exchanger Tools")
 st.caption("Two tools in one Streamlit app: single heat-exchanger design/cost and heat-integration matching optimization.")
 
+ELECTRICITY_COST_PER_KWH = 0.0866  # USD/kWh
+MOTOR_EFFICIENCY = 0.95
+PUMP_HEAD_M = 1.0
+HX_LIFE_YEARS = 10.0
+WATER_DENSITY = 1000.0
+G_ACCEL = 9.81
+
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
     if ntu <= 0:
@@ -130,6 +137,30 @@ def calculate_shell_tube_cost(area_m2, exchanger_type, pressure_band, material, 
     }
 
 
+def pumping_power_kw(mc, pump_eff, density=WATER_DENSITY, g=G_ACCEL):
+    if mc <= 0 or pump_eff <= 0 or MOTOR_EFFICIENCY <= 0:
+        return 0.0
+
+    p_hydraulic_w = mc * g * PUMP_HEAD_M / density
+    p_shaft_w = p_hydraulic_w / pump_eff
+    p_elec_w = p_shaft_w / MOTOR_EFFICIENCY
+    return p_elec_w / 1000.0
+
+
+def pumping_cost_per_year(mc, pump_eff, hours_per_year, density=WATER_DENSITY, g=G_ACCEL):
+    p_kw = pumping_power_kw(mc, pump_eff, density=density, g=g)
+    energy_kwh = p_kw * hours_per_year
+    return energy_kwh * ELECTRICITY_COST_PER_KWH
+
+
+def annualized_hx_cost(hx_cost):
+    return hx_cost / HX_LIFE_YEARS
+
+
+def total_annual_cost(hx_cost, pump_cost_year):
+    return annualized_hx_cost(hx_cost) + pump_cost_year
+
+
 def style_temperature_cells(df_in, min_hot_outlet_temp, max_cold_outlet_temp):
     styles = pd.DataFrame("", index=df_in.index, columns=df_in.columns)
 
@@ -191,7 +222,7 @@ def render_source_inputs(source_num, defaults):
 
 def render_sink_inputs(sink_num, defaults):
     st.markdown(f"### Heat Sink {sink_num}")
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
 
     with c1:
         tci = st.number_input(
@@ -224,11 +255,23 @@ def render_sink_inputs(sink_num, defaults):
             key=f"snk_h_cold_{sink_num}"
         )
 
+    with c3:
+        pump_eff = st.number_input(
+            f"Pump efficiency (0–1, head = 1 m) - Sink {sink_num}",
+            min_value=0.01,
+            max_value=1.0,
+            value=defaults["pump_eff"],
+            step=0.01,
+            key=f"snk_pump_eff_{sink_num}"
+        )
+        st.caption(f"Head fixed at {PUMP_HEAD_M:.1f} m, motor efficiency fixed at {MOTOR_EFFICIENCY:.2f}")
+
     return {
         "tci": tci,
         "mc": mc,
         "cpc": cpc,
         "h_cold": h_cold,
+        "pump_eff": pump_eff,
     }
 
 
@@ -363,6 +406,33 @@ with tab1:
         with p2:
             cpc = st.number_input("Cold Fluid Specific Heat, c_p,c (Water) (J/kg-K)", min_value=1.0, value=4180.0, step=10.0)
 
+        st.markdown("## Cold-side pumping inputs")
+        pp1, pp2 = st.columns(2)
+
+        with pp1:
+            cold_pump_eff = st.number_input(
+                "Cold-side pump efficiency (0–1, head = 1 m)",
+                min_value=0.01,
+                max_value=1.0,
+                value=0.70,
+                step=0.01
+            )
+
+        with pp2:
+            hours_per_year = st.number_input(
+                "Operating hours per year (h/yr)",
+                min_value=0.0,
+                value=8000.0,
+                step=100.0
+            )
+
+        st.caption(
+            f"Electricity cost fixed at ${ELECTRICITY_COST_PER_KWH:.4f}/kWh, "
+            f"motor efficiency fixed at {MOTOR_EFFICIENCY:.2f}, "
+            f"pump head fixed at {PUMP_HEAD_M:.1f} m, "
+            f"HX life fixed at {int(HX_LIFE_YEARS)} years."
+        )
+
         st.markdown("## Shell-and-tube cost inputs")
         c1, c2, c3 = st.columns(3)
 
@@ -400,6 +470,8 @@ with tab1:
                 st.error("Heat exchanger area must be greater than zero.")
             elif h_hot <= 0 or h_cold <= 0 or tube_thickness <= 0 or tube_k <= 0:
                 st.error("Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero.")
+            elif cold_pump_eff <= 0:
+                st.error("Pump efficiency must be greater than zero.")
             else:
                 u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
 
@@ -416,6 +488,15 @@ with tab1:
                         ci_calc
                     )
 
+                    hx_capital = cost["updated_cost"]
+                    pump_cost_year = pumping_cost_per_year(
+                        mc=mc,
+                        pump_eff=cold_pump_eff,
+                        hours_per_year=hours_per_year
+                    )
+                    hx_annual = annualized_hx_cost(hx_capital)
+                    tac = total_annual_cost(hx_capital, pump_cost_year)
+
                     rows.append({
                         "Iteration": i + 1,
                         "Area_m2": iter_area,
@@ -428,7 +509,10 @@ with tab1:
                         "NTU": result["NTU"],
                         "Effectiveness": result["Effectiveness"],
                         "Q_kW": result["Q_kW"],
-                        "HX_Cost_USD": cost["updated_cost"],
+                        "HX_Cost_USD": hx_capital,
+                        "Pump_Cost_USD_per_year": pump_cost_year,
+                        "HX_Annualized_Cost_USD_per_year": hx_annual,
+                        "Total_Annual_Cost_USD_per_year": tac,
                     })
 
                 df = pd.DataFrame(rows)
@@ -443,6 +527,9 @@ with tab1:
                         "T_c_out_C",
                         "Q_kW",
                         "HX_Cost_USD",
+                        "Pump_Cost_USD_per_year",
+                        "HX_Annualized_Cost_USD_per_year",
+                        "Total_Annual_Cost_USD_per_year",
                     ]
                 ].rename(columns={
                     "Area_m2": "Area (m²)",
@@ -451,7 +538,10 @@ with tab1:
                     "T_c_in_C": "Cold Inlet Temp (°C)",
                     "T_c_out_C": "Cold Outlet Temp (°C)",
                     "Q_kW": "Heat Duty (kW)",
-                    "HX_Cost_USD": "HX Cost ($)",
+                    "HX_Cost_USD": "HX Capital Cost ($)",
+                    "Pump_Cost_USD_per_year": "Pump Operating Cost ($/yr)",
+                    "HX_Annualized_Cost_USD_per_year": "HX Annualized Cost ($/yr)",
+                    "Total_Annual_Cost_USD_per_year": "Total Annual Cost ($/yr)",
                 })
 
                 styled_df = (
@@ -469,7 +559,10 @@ with tab1:
                         "Cold Inlet Temp (°C)": "{:.2f}",
                         "Cold Outlet Temp (°C)": "{:.2f}",
                         "Heat Duty (kW)": "{:.4f}",
-                        "HX Cost ($)": "${:,.2f}",
+                        "HX Capital Cost ($)": "${:,.2f}",
+                        "Pump Operating Cost ($/yr)": "${:,.2f}",
+                        "HX Annualized Cost ($/yr)": "${:,.2f}",
+                        "Total Annual Cost ($/yr)": "${:,.2f}",
                     })
                 )
 
@@ -488,7 +581,7 @@ with tab1:
                 valid_rows = df[valid_mask]
 
                 if not valid_rows.empty:
-                    best_row = valid_rows.loc[valid_rows["HX_Cost_USD"].idxmin()]
+                    best_row = valid_rows.loc[valid_rows["Total_Annual_Cost_USD_per_year"].idxmin()]
 
                     result_data = pd.DataFrame({
                         "Parameter": [
@@ -497,7 +590,10 @@ with tab1:
                             "Cold fluid inlet temperature (°C)",
                             "Cold fluid outlet temperature (°C)",
                             "Heat Exchanger (HX) duty (kW)",
-                            "Heat Exchanger cost ($)"
+                            "Heat Exchanger capital cost ($)",
+                            "Pump operating cost ($/yr)",
+                            "HX annualized cost ($/yr)",
+                            "Total annual cost ($/yr)"
                         ],
                         "Value": [
                             f"{best_row['T_h_in_C']:.2f}",
@@ -505,27 +601,42 @@ with tab1:
                             f"{best_row['T_c_in_C']:.2f}",
                             f"{best_row['T_c_out_C']:.2f}",
                             f"{best_row['Q_kW']:.4f}",
-                            f"${best_row['HX_Cost_USD']:,.2f}"
+                            f"${best_row['HX_Cost_USD']:,.2f}",
+                            f"${best_row['Pump_Cost_USD_per_year']:,.2f}",
+                            f"${best_row['HX_Annualized_Cost_USD_per_year']:,.2f}",
+                            f"${best_row['Total_Annual_Cost_USD_per_year']:,.2f}"
                         ]
                     })
 
                     st.table(result_data)
                 else:
-                    st.info("No minimum cost condition reached.")
+                    st.info("No feasible configuration satisfies the outlet-temperature constraints.")
 
-                st.subheader("Heat Exchanger Cost vs Heat Duty")
+                st.subheader("Heat Exchanger Capital Cost vs Heat Duty")
 
                 base = alt.Chart(df).encode(
                     x=alt.X("Q_kW:Q", title="Heat Duty (kW)"),
-                    y=alt.Y("HX_Cost_USD:Q", title="HX Cost ($)")
+                    y=alt.Y("HX_Cost_USD:Q", title="HX Capital Cost ($)")
                 )
 
                 line = base.mark_line()
                 points = base.mark_point(filled=True, size=80)
 
                 chart = (line + points).interactive()
-
                 st.altair_chart(chart, use_container_width=True)
+
+                st.subheader("Total Annual Cost vs Heat Duty")
+
+                base_tac = alt.Chart(df).encode(
+                    x=alt.X("Q_kW:Q", title="Heat Duty (kW)"),
+                    y=alt.Y("Total_Annual_Cost_USD_per_year:Q", title="Total Annual Cost ($/yr)")
+                )
+
+                line_tac = base_tac.mark_line(color="#2E86AB")
+                points_tac = base_tac.mark_point(filled=True, size=80, color="#2E86AB")
+
+                chart_tac = (line_tac + points_tac).interactive()
+                st.altair_chart(chart_tac, use_container_width=True)
 
                 csv = df_display.to_csv(index=False).encode("utf-8")
                 st.download_button(
@@ -545,6 +656,26 @@ with tab2:
         "then assign each source to one unique sink and one unique exchanger."
     )
 
+    st.markdown("## Global operating assumptions")
+    go1, go2 = st.columns(2)
+
+    with go1:
+        hours_per_year_global = st.number_input(
+            "Operating hours per year (h/yr)",
+            min_value=0.0,
+            value=8000.0,
+            step=100.0,
+            key="global_hours_per_year"
+        )
+
+    with go2:
+        st.caption(
+            f"Electricity cost fixed at ${ELECTRICITY_COST_PER_KWH:.4f}/kWh, "
+            f"motor efficiency fixed at {MOTOR_EFFICIENCY:.2f}, "
+            f"pump head fixed at {PUMP_HEAD_M:.1f} m, "
+            f"HX life fixed at {int(HX_LIFE_YEARS)} years."
+        )
+
     source_defaults = {
         "thi": 120.0,
         "mh": 1.2,
@@ -557,6 +688,7 @@ with tab2:
         "mc": 1.0,
         "cpc": 4180.0,
         "h_cold": 1500.0,
+        "pump_eff": 0.70,
     }
 
     hx_defaults = {
@@ -569,15 +701,23 @@ with tab2:
 
     if "matched_results_df" not in st.session_state:
         st.session_state.matched_results_df = None
-    if "matched_total_cost" not in st.session_state:
-        st.session_state.matched_total_cost = None
+    if "matched_total_capital" not in st.session_state:
+        st.session_state.matched_total_capital = None
     if "matched_total_heat_duty" not in st.session_state:
         st.session_state.matched_total_heat_duty = None
+    if "matched_total_pump_cost" not in st.session_state:
+        st.session_state.matched_total_pump_cost = None
+    if "matched_total_annual_cost" not in st.session_state:
+        st.session_state.matched_total_annual_cost = None
 
     if "optimized_results_df" not in st.session_state:
         st.session_state.optimized_results_df = None
-    if "optimized_total_cost" not in st.session_state:
-        st.session_state.optimized_total_cost = None
+    if "optimized_total_capital" not in st.session_state:
+        st.session_state.optimized_total_capital = None
+    if "optimized_total_pump_cost" not in st.session_state:
+        st.session_state.optimized_total_pump_cost = None
+    if "optimized_total_annual_cost" not in st.session_state:
+        st.session_state.optimized_total_annual_cost = None
     if "optimized_total_q" not in st.session_state:
         st.session_state.optimized_total_q = None
     if "optimized_feasible_count" not in st.session_state:
@@ -681,8 +821,9 @@ with tab2:
                         or sink["h_cold"] <= 0
                         or hx["tube_thickness"] <= 0
                         or hx["tube_k"] <= 0
+                        or sink["pump_eff"] <= 0
                     ):
-                        st.error(f"Source {i}: invalid heat-transfer or tube-property input.")
+                        st.error(f"Source {i}: invalid heat-transfer, tube-property, or pump input.")
                         continue
 
                     u = calculate_overall_u(
@@ -712,6 +853,15 @@ with tab2:
                         hx["ci_calc"]
                     )
 
+                    hx_capital = cost["updated_cost"]
+                    pump_cost_year = pumping_cost_per_year(
+                        mc=sink["mc"],
+                        pump_eff=sink["pump_eff"],
+                        hours_per_year=hours_per_year_global
+                    )
+                    hx_annual = annualized_hx_cost(hx_capital)
+                    tac = total_annual_cost(hx_capital, pump_cost_year)
+
                     results_rows.append({
                         "Source": f"Source {i}",
                         "Sink": selected_sinks[i - 1],
@@ -722,9 +872,15 @@ with tab2:
                         "Overall U (W/m²-K)": f"{u:.2f}",
                         "NTU": f"{result['NTU']:.4f}",
                         "Effectiveness": f"{result['Effectiveness']:.4f}",
-                        "HX cost ($)": f"${cost['updated_cost']:,.2f}",
-                        "HX cost numeric": cost["updated_cost"],
+                        "HX Capital Cost ($)": f"${hx_capital:,.2f}",
+                        "Pump Operating Cost ($/yr)": f"${pump_cost_year:,.2f}",
+                        "HX Annualized Cost ($/yr)": f"${hx_annual:,.2f}",
+                        "Total Annual Cost ($/yr)": f"${tac:,.2f}",
+                        "HX capital numeric": hx_capital,
                         "Heat duty numeric": result["Q_kW"],
+                        "Pump cost numeric": pump_cost_year,
+                        "HX annual numeric": hx_annual,
+                        "Total annual numeric": tac,
                     })
 
                 except Exception as e:
@@ -732,20 +888,28 @@ with tab2:
 
         if results_rows:
             results_df = pd.DataFrame(results_rows)
-            st.session_state.matched_total_cost = results_df["HX cost numeric"].sum()
+            st.session_state.matched_total_capital = results_df["HX capital numeric"].sum()
             st.session_state.matched_total_heat_duty = results_df["Heat duty numeric"].sum()
+            st.session_state.matched_total_pump_cost = results_df["Pump cost numeric"].sum()
+            st.session_state.matched_total_annual_cost = results_df["Total annual numeric"].sum()
             st.session_state.matched_results_df = results_df.drop(
-                columns=["HX cost numeric", "Heat duty numeric"]
+                columns=[
+                    "HX capital numeric",
+                    "Heat duty numeric",
+                    "Pump cost numeric",
+                    "HX annual numeric",
+                    "Total annual numeric"
+                ]
             )
-
-    
 
     optimize = st.button("Click to optimize pairs for maximum heat integration", type="secondary")
     st.markdown("## Results")
-    
+
     if optimize:
         best_solution = None
-        best_total_cost = None
+        best_total_capital = None
+        best_total_pump_cost = None
+        best_total_annual_cost = None
         best_total_q = None
         feasible_count = 0
 
@@ -755,7 +919,9 @@ with tab2:
         for sink_perm in sink_permutations:
             for hx_perm in hx_permutations:
                 current_rows = []
-                current_total_cost = 0.0
+                current_total_capital = 0.0
+                current_total_pump_cost = 0.0
+                current_total_annual_cost = 0.0
                 current_total_q = 0.0
                 feasible = True
 
@@ -778,6 +944,7 @@ with tab2:
                             or sink["h_cold"] <= 0
                             or hx["tube_thickness"] <= 0
                             or hx["tube_k"] <= 0
+                            or sink["pump_eff"] <= 0
                         ):
                             feasible = False
                             break
@@ -809,7 +976,18 @@ with tab2:
                             hx["ci_calc"]
                         )
 
-                        current_total_cost += cost["updated_cost"]
+                        hx_capital = cost["updated_cost"]
+                        pump_cost_year = pumping_cost_per_year(
+                            mc=sink["mc"],
+                            pump_eff=sink["pump_eff"],
+                            hours_per_year=hours_per_year_global
+                        )
+                        hx_annual = annualized_hx_cost(hx_capital)
+                        tac = total_annual_cost(hx_capital, pump_cost_year)
+
+                        current_total_capital += hx_capital
+                        current_total_pump_cost += pump_cost_year
+                        current_total_annual_cost += tac
                         current_total_q += result["Q_kW"]
 
                         current_rows.append({
@@ -822,7 +1000,10 @@ with tab2:
                             "Overall U (W/m²-K)": f"{u:.2f}",
                             "NTU": f"{result['NTU']:.4f}",
                             "Effectiveness": f"{result['Effectiveness']:.4f}",
-                            "HX cost ($)": f"${cost['updated_cost']:,.2f}",
+                            "HX Capital Cost ($)": f"${hx_capital:,.2f}",
+                            "Pump Operating Cost ($/yr)": f"${pump_cost_year:,.2f}",
+                            "HX Annualized Cost ($/yr)": f"${hx_annual:,.2f}",
+                            "Total Annual Cost ($/yr)": f"${tac:,.2f}",
                         })
 
                     except Exception:
@@ -837,21 +1018,27 @@ with tab2:
                         or current_total_q > best_total_q
                         or (
                             abs(current_total_q - best_total_q) < 1e-9
-                            and current_total_cost < best_total_cost
+                            and current_total_annual_cost < best_total_annual_cost
                         )
                     ):
                         best_solution = current_rows
-                        best_total_cost = current_total_cost
+                        best_total_capital = current_total_capital
+                        best_total_pump_cost = current_total_pump_cost
+                        best_total_annual_cost = current_total_annual_cost
                         best_total_q = current_total_q
 
         if best_solution is not None:
             st.session_state.optimized_results_df = pd.DataFrame(best_solution)
-            st.session_state.optimized_total_cost = best_total_cost
+            st.session_state.optimized_total_capital = best_total_capital
+            st.session_state.optimized_total_pump_cost = best_total_pump_cost
+            st.session_state.optimized_total_annual_cost = best_total_annual_cost
             st.session_state.optimized_total_q = best_total_q
             st.session_state.optimized_feasible_count = feasible_count
         else:
             st.session_state.optimized_results_df = None
-            st.session_state.optimized_total_cost = None
+            st.session_state.optimized_total_capital = None
+            st.session_state.optimized_total_pump_cost = None
+            st.session_state.optimized_total_annual_cost = None
             st.session_state.optimized_total_q = None
             st.session_state.optimized_feasible_count = 0
 
@@ -859,22 +1046,29 @@ with tab2:
         st.subheader("Matched results")
         st.dataframe(st.session_state.matched_results_df, use_container_width=True)
 
-        # st.markdown("## 5) Total cost of heat integration")
-        c1, c2 = st.columns(2)
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
-            st.metric("Total cost of heat integration for selected pairs", f"${st.session_state.matched_total_cost:,.2f}")
+            st.metric("Total HX capital for selected pairs", f"${st.session_state.matched_total_capital:,.2f}")
         with c2:
-            st.metric("Total heat integration for selected pairs", f"{st.session_state.matched_total_heat_duty:.4f} kW")
+            st.metric("Total pump operating cost", f"${st.session_state.matched_total_pump_cost:,.2f}/yr")
+        with c3:
+            st.metric("Total annual cost", f"${st.session_state.matched_total_annual_cost:,.2f}/yr")
+        with c4:
+            st.metric("Total heat integration", f"{st.session_state.matched_total_heat_duty:.4f} kW")
 
     if st.session_state.optimized_results_df is not None:
         st.subheader("Optimal matched results for maximum heat integration")
         st.dataframe(st.session_state.optimized_results_df, use_container_width=True)
 
-        c1, c2 = st.columns(2)
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
             st.metric("Maximum total heat integration", f"{st.session_state.optimized_total_q:.4f} kW")
         with c2:
-            st.metric("Cost for maximum heat integration", f"${st.session_state.optimized_total_cost:,.2f}")
+            st.metric("Total HX capital", f"${st.session_state.optimized_total_capital:,.2f}")
+        with c3:
+            st.metric("Total pump operating cost", f"${st.session_state.optimized_total_pump_cost:,.2f}/yr")
+        with c4:
+            st.metric("Total annual cost", f"${st.session_state.optimized_total_annual_cost:,.2f}/yr")
 
         total_assignments = math.factorial(4) * math.factorial(4)
         st.caption(
@@ -883,4 +1077,3 @@ with tab2:
         )
     elif optimize:
         st.warning("No feasible one-to-one assignment found for the given inputs.")
-        
