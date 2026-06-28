@@ -725,6 +725,10 @@ with tab2:
         st.session_state.optimized_total_q = None
     if "optimized_feasible_count" not in st.session_state:
         st.session_state.optimized_feasible_count = None
+    if "show_matched_results" not in st.session_state:
+        st.session_state.show_matched_results = False
+    if "show_optimized_results" not in st.session_state:
+        st.session_state.show_optimized_results = False
 
     st.markdown("## Inputs for Heat sources")
     source_tabs = st.tabs([f"Source {i}" for i in range(1, 5)])
@@ -775,6 +779,9 @@ with tab2:
 
     calculate = st.button("Click to calculate results for selected pairs")
     if calculate:
+        st.session_state.show_matched_results = True
+        st.session_state.show_optimized_results = False
+
         results_rows = []
         sink_index_map = {f"Sink {i}": i - 1 for i in range(1, 5)}
         hx_index_map = {f"HX {i}": i - 1 for i in range(1, 5)}
@@ -836,12 +843,15 @@ with tab2:
                 st.session_state.matched_total_heat_duty = results_df["Heat duty numeric"].sum()
                 st.session_state.matched_total_pump_cost = results_df["Pump cost numeric"].sum()
                 st.session_state.matched_total_annual_cost = results_df["Total annual numeric"].sum()
-                st.session_state.matched_results_df = results_df.drop(columns=["HX capital numeric", "Heat duty numeric", "Pump cost numeric", "HX annual numeric", "Total annual numeric"])
+                st.session_state.matched_results_df = results_df.drop(
+                    columns=["HX capital numeric", "Heat duty numeric", "Pump cost numeric", "HX annual numeric", "Total annual numeric"]
+                )
 
     optimize = st.button("Click to optimize pairs for maximum heat integration", type="secondary")
-    st.markdown("## Results")
-
     if optimize:
+        st.session_state.show_optimized_results = True
+        st.session_state.show_matched_results = False
+
         best_solution = None
         best_total_capital = None
         best_total_pump_cost = None
@@ -891,7 +901,9 @@ with tab2:
 
                 if feasible:
                     feasible_count += 1
-                    if best_solution is None or current_total_q > best_total_q or (abs(current_total_q - best_total_q) < 1e-9 and current_total_annual_cost < best_total_annual_cost):
+                    if best_solution is None or current_total_q > best_total_q or (
+                        abs(current_total_q - best_total_q) < 1e-9 and current_total_annual_cost < best_total_annual_cost
+                    ):
                         best_solution = True
                         best_total_capital = current_total_capital
                         best_total_pump_cost = current_total_pump_cost
@@ -992,7 +1004,9 @@ with tab2:
             st.session_state.optimized_total_q = None
             st.session_state.optimized_feasible_count = 0
 
-    if st.session_state.matched_results_df is not None:
+    st.markdown("## Results")
+
+    if st.session_state.get("show_matched_results", False) and st.session_state.matched_results_df is not None:
         st.subheader("Matched results")
         st.dataframe(st.session_state.matched_results_df, use_container_width=True)
         st.markdown("### Matched pairs visual")
@@ -1008,7 +1022,7 @@ with tab2:
         with c4:
             st.metric("Total heat integration", f"{st.session_state.matched_total_heat_duty:.4f} kW")
 
-    if st.session_state.optimized_results_df is not None:
+    if st.session_state.get("show_optimized_results", False) and st.session_state.optimized_results_df is not None:
         st.subheader("Optimal matched results for maximum heat integration")
         st.dataframe(st.session_state.optimized_results_df, use_container_width=True)
         st.markdown("### Optimized pairs visual")
@@ -1026,5 +1040,3 @@ with tab2:
 
         total_assignments = math.factorial(4) * math.factorial(4)
         st.caption(f"Feasible assignments found: {st.session_state.optimized_feasible_count} out of {total_assignments} total assignments checked.")
-    elif optimize:
-        st.warning("No feasible one-to-one assignment found for the given inputs.")
