@@ -1,4 +1,5 @@
 import math
+import pandas as pd
 import streamlit as st
 
 st.set_page_config(
@@ -192,7 +193,7 @@ with st.form("hx_single_case_form"):
     with c3:
         ci_calc = st.number_input("Calculation-year cost index", min_value=0.0001, value=800.0, step=1.0)
 
-    submitted = st.form_submit_button("Calculate HX Cost")
+    submitted = st.form_submit_button("Calculate")
 
 
 if submitted:
@@ -205,9 +206,7 @@ if submitted:
             st.error("Heat transfer coefficients, tube thickness, and tube thermal conductivity must be greater than zero.")
         else:
             u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
-
-            _ = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
-
+            result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
             cost = calculate_shell_tube_cost(
                 area,
                 exchanger_type,
@@ -217,8 +216,24 @@ if submitted:
                 ci_calc
             )
 
-            st.subheader("Result")
-            st.metric("HX Cost ($)", f"${cost['updated_cost']:,.2f}")
+            st.subheader("Results")
+
+            result_data = pd.DataFrame({
+                "Parameter": [
+                    "Hot fluid outlet temperature (°C)",
+                    "Cold fluid outlet temperature (°C)",
+                    "Heat extracted / Heat duty (kW)",
+                    "Heat Exchanger cost ($)"
+                ],
+                "Value": [
+                    f"{result['T_h_out']:.2f}",
+                    f"{result['T_c_out']:.2f}",
+                    f"{result['Q_kW']:.4f}",
+                    f"${cost['updated_cost']:,.2f}"
+                ]
+            })
+
+            st.table(result_data)
 
     except Exception as e:
         st.error(str(e))
