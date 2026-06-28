@@ -9,7 +9,10 @@ st.set_page_config(
 )
 
 st.title("Heat Exchanger Matching + Cost")
-st.caption("Enter 4 heat sources, 4 heat sinks, and 4 heat exchangers, then create one-to-one assignments.")
+st.caption(
+    "Enter 4 heat sources, 4 heat sinks, and 4 heat exchangers, "
+    "then assign each source to one unique sink and one unique exchanger."
+)
 
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
@@ -291,6 +294,11 @@ def render_exchanger_inputs(hx_num, defaults):
     }
 
 
+def reset_invalid_choice(widget_key, valid_options):
+    if widget_key in st.session_state and st.session_state[widget_key] not in valid_options:
+        del st.session_state[widget_key]
+
+
 source_defaults = {
     "thi": 120.0,
     "mh": 1.2,
@@ -313,64 +321,72 @@ hx_defaults = {
     "ci_calc": 800.0,
 }
 
-with st.form("hx_matching_form"):
-    st.markdown("## 1) Heat sources")
-    source_tabs = st.tabs([f"Source {i}" for i in range(1, 5)])
-    sources = []
-    for i, tab in enumerate(source_tabs, start=1):
-        with tab:
-            sources.append(render_source_inputs(i, source_defaults))
+st.markdown("## 1) Heat sources")
+source_tabs = st.tabs([f"Source {i}" for i in range(1, 5)])
+sources = []
+for i, tab in enumerate(source_tabs, start=1):
+    with tab:
+        sources.append(render_source_inputs(i, source_defaults))
 
-    st.markdown("## 2) Heat sinks")
-    sink_tabs = st.tabs([f"Sink {i}" for i in range(1, 5)])
-    sinks = []
-    for i, tab in enumerate(sink_tabs, start=1):
-        with tab:
-            sinks.append(render_sink_inputs(i, sink_defaults))
+st.markdown("## 2) Heat sinks")
+sink_tabs = st.tabs([f"Sink {i}" for i in range(1, 5)])
+sinks = []
+for i, tab in enumerate(sink_tabs, start=1):
+    with tab:
+        sinks.append(render_sink_inputs(i, sink_defaults))
 
-    st.markdown("## 3) Heat exchangers")
-    hx_tabs = st.tabs([f"HX {i}" for i in range(1, 5)])
-    exchangers = []
-    for i, tab in enumerate(hx_tabs, start=1):
-        with tab:
-            exchangers.append(render_exchanger_inputs(i, hx_defaults))
+st.markdown("## 3) Heat exchangers")
+hx_tabs = st.tabs([f"HX {i}" for i in range(1, 5)])
+exchangers = []
+for i, tab in enumerate(hx_tabs, start=1):
+    with tab:
+        exchangers.append(render_exchanger_inputs(i, hx_defaults))
 
-    st.markdown("## 4) Assign sinks and exchangers to each source")
+st.markdown("## 4) Assign sinks and exchangers to each source")
 
-    sink_labels = [f"Sink {i}" for i in range(1, 5)]
-    hx_labels = [f"HX {i}" for i in range(1, 5)]
+sink_labels = [f"Sink {i}" for i in range(1, 5)]
+hx_labels = [f"HX {i}" for i in range(1, 5)]
 
-    selected_sinks = []
-    selected_hx = []
+selected_sinks = []
+selected_hx = []
 
-    for i in range(1, 5):
-        st.markdown(f"### Matching for Source {i}")
-        c1, c2 = st.columns(2)
+for i in range(1, 5):
+    st.markdown(f"### Matching for Source {i}")
+    c1, c2 = st.columns(2)
 
-        available_sinks = [s for s in sink_labels if s not in selected_sinks]
-        available_hx = [h for h in hx_labels if h not in selected_hx]
+    remaining_sinks = [s for s in sink_labels if s not in selected_sinks]
+    remaining_hx = [h for h in hx_labels if h not in selected_hx]
 
-        with c1:
-            sink_choice = st.selectbox(
-                f"Choose sink for Source {i}",
-                options=available_sinks,
-                key=f"match_sink_{i}"
-            )
+    sink_key = f"match_sink_{i}"
+    hx_key = f"match_hx_{i}"
 
-        with c2:
-            hx_choice = st.selectbox(
-                f"Choose exchanger for Source {i}",
-                options=available_hx,
-                key=f"match_hx_{i}"
-            )
+    reset_invalid_choice(sink_key, remaining_sinks)
+    reset_invalid_choice(hx_key, remaining_hx)
 
-        selected_sinks.append(sink_choice)
-        selected_hx.append(hx_choice)
+    with c1:
+        sink_choice = st.selectbox(
+            f"Choose sink for Source {i}",
+            options=remaining_sinks,
+            key=sink_key
+        )
 
-    submitted = st.form_submit_button("Calculate matched system")
+    selected_sinks.append(sink_choice)
 
+    remaining_hx = [h for h in hx_labels if h not in selected_hx]
+    reset_invalid_choice(hx_key, remaining_hx)
 
-if submitted:
+    with c2:
+        hx_choice = st.selectbox(
+            f"Choose exchanger for Source {i}",
+            options=remaining_hx,
+            key=hx_key
+        )
+
+    selected_hx.append(hx_choice)
+
+calculate = st.button("Calculate matched system", type="primary")
+
+if calculate:
     results_rows = []
 
     sink_index_map = {f"Sink {i}": i - 1 for i in range(1, 5)}
@@ -388,7 +404,10 @@ if submitted:
 
             try:
                 if source["thi"] <= sink["tci"]:
-                    st.error(f"Source {i}: hot inlet temperature must be greater than the selected sink cold inlet temperature.")
+                    st.error(
+                        f"Source {i}: hot inlet temperature must be greater "
+                        f"than the selected sink cold inlet temperature."
+                    )
                     continue
 
                 if hx["area"] <= 0:
