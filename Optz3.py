@@ -1,4 +1,5 @@
 import math
+import itertools
 import pandas as pd
 import streamlit as st
 import altair as alt
@@ -723,3 +724,131 @@ with tab2:
 
             st.markdown("## 5) Total cost of heat integration")
             st.metric("Total cost of heat integration", f"${total_cost:,.2f}")
+
+    st.markdown("## 6) Optimize Heat Integration Cost")
+    st.caption(
+        "Automatically find the one-to-one pairing of heat sources, heat sinks, "
+        "and heat exchangers that gives the least-cost feasible result."
+    )
+
+    optimize = st.button("Optimize heat integration cost", type="secondary")
+
+    if optimize:
+        best_solution = None
+        best_total_cost = None
+        best_total_q = None
+        feasible_count = 0
+
+        sink_permutations = list(itertools.permutations(range(4)))
+        hx_permutations = list(itertools.permutations(range(4)))
+
+        for sink_perm in sink_permutations:
+            for hx_perm in hx_permutations:
+                current_rows = []
+                current_total_cost = 0.0
+                current_total_q = 0.0
+                feasible = True
+
+                for i in range(4):
+                    source = sources[i]
+                    sink = sinks[sink_perm[i]]
+                    hx = exchangers[hx_perm[i]]
+
+                    try:
+                        if source["thi"] <= sink["tci"]:
+                            feasible = False
+                            break
+
+                        if hx["area"] <= 0:
+                            feasible = False
+                            break
+
+                        if (
+                            source["h_hot"] <= 0
+                            or sink["h_cold"] <= 0
+                            or hx["tube_thickness"] <= 0
+                            or hx["tube_k"] <= 0
+                        ):
+                            feasible = False
+                            break
+
+                        u = calculate_overall_u(
+                            source["h_hot"],
+                            sink["h_cold"],
+                            hx["tube_thickness"],
+                            hx["tube_k"]
+                        )
+
+                        result = solve_known_mc(
+                            source["thi"],
+                            sink["tci"],
+                            source["mh"],
+                            sink["mc"],
+                            source["cph"],
+                            sink["cpc"],
+                            u,
+                            hx["area"]
+                        )
+
+                        cost = calculate_shell_tube_cost(
+                            hx["area"],
+                            hx["exchanger_type"],
+                            hx["pressure_band"],
+                            hx["material"],
+                            hx["ci_base"],
+                            hx["ci_calc"]
+                        )
+
+                        current_total_cost += cost["updated_cost"]
+                        current_total_q += result["Q_kW"]
+
+                        current_rows.append({
+                            "Source": f"Source {i + 1}",
+                            "Sink": f"Sink {sink_perm[i] + 1}",
+                            "Exchanger": f"HX {hx_perm[i] + 1}",
+                            "Hot outlet temp (°C)": f"{result['T_h_out']:.2f}",
+                            "Cold outlet temp (°C)": f"{result['T_c_out']:.2f}",
+                            "Heat duty (kW)": f"{result['Q_kW']:.4f}",
+                            "Overall U (W/m²-K)": f"{u:.2f}",
+                            "NTU": f"{result['NTU']:.4f}",
+                            "Effectiveness": f"{result['Effectiveness']:.4f}",
+                            "HX cost ($)": f"${cost['updated_cost']:,.2f}",
+                        })
+
+                    except Exception:
+                        feasible = False
+                        break
+
+                if feasible:
+                    feasible_count += 1
+
+                    if (
+                        best_solution is None
+                        or current_total_cost < best_total_cost
+                        or (
+                            abs(current_total_cost - best_total_cost) < 1e-9
+                            and current_total_q > best_total_q
+                        )
+                    ):
+                        best_solution = current_rows
+                        best_total_cost = current_total_cost
+                        best_total_q = current_total_q
+
+        if best_solution is not None:
+            best_df = pd.DataFrame(best_solution)
+
+            st.subheader("Optimal matched results")
+            st.dataframe(best_df, use_container_width=True)
+
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("Optimal total cost", f"${best_total_cost:,.2f}")
+            with c2:
+                st.metric("Optimal total heat duty", f"{best_total_q:.4f} kW")
+
+            st.caption(
+                f"Feasible assignments found: {feasible_count} "
+                f"out of {len(sink_permutations) * len(hx_permutations)} total assignments checked."
+            )
+        else:
+            st.warning("No feasible one-to-one assignment found for the given inputs.")
