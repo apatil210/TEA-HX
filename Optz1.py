@@ -1,7 +1,5 @@
 import math
-import pandas as pd
 import streamlit as st
-import altair as alt
 
 st.set_page_config(
     page_title="Heat Exchanger Design + Cost",
@@ -128,23 +126,7 @@ def calculate_shell_tube_cost(area_m2, exchanger_type, pressure_band, material, 
     }
 
 
-def style_temperature_cells(df_in, min_hot_outlet_temp, max_cold_outlet_temp):
-    styles = pd.DataFrame("", index=df_in.index, columns=df_in.columns)
-
-    hot_col = "Hot Outlet Temp (°C)"
-    cold_col = "Cold Outlet Temp (°C)"
-
-    styles.loc[df_in[hot_col] < min_hot_outlet_temp, hot_col] = (
-        "background-color: #ff4d4f; color: white;"
-    )
-    styles.loc[df_in[cold_col] > max_cold_outlet_temp, cold_col] = (
-        "background-color: #ff4d4f; color: white;"
-    )
-
-    return styles
-
-
-with st.form("ntu_single_case_form"):
+with st.form("hx_single_case_form"):
     st.markdown("## Input values")
     col1, col2 = st.columns(2)
 
@@ -153,8 +135,6 @@ with st.form("ntu_single_case_form"):
         tci = st.number_input("Initial Cold Fluid Temp (avg T of return water) (°C)", value=25.0)
         mh = st.number_input("Mass Flow of Hot Fluid (kg/s)", min_value=0.0001, value=1.2, step=0.1, format="%.4f")
         mc = st.number_input("Mass Flow of Cold Fluid (kg/s)", min_value=0.0001, value=1.0, step=0.1, format="%.4f")
-        min_hot_outlet_temp = st.number_input("Min outlet temperature for hot fluid (°C)", value=60.0)
-        max_cold_outlet_temp = st.number_input("Max outlet temperature for cold fluid (°C)", value=80.0)
 
     with col2:
         area = st.number_input("Value of HX area (m²)", min_value=0.0001, value=20.0, step=0.1)
@@ -212,7 +192,7 @@ with st.form("ntu_single_case_form"):
     with c3:
         ci_calc = st.number_input("Calculation-year cost index", min_value=0.0001, value=800.0, step=1.0)
 
-    submitted = st.form_submit_button("Calculate 10 Iterations")
+    submitted = st.form_submit_button("Calculate HX Cost")
 
 
 if submitted:
@@ -226,137 +206,19 @@ if submitted:
         else:
             u = calculate_overall_u(h_hot, h_cold, tube_thickness, tube_k)
 
-            rows = []
-            for i in range(10):
-                iter_area = area * (1.2 ** i)
-                result = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, iter_area)
-                cost = calculate_shell_tube_cost(
-                    iter_area,
-                    exchanger_type,
-                    pressure_band,
-                    material,
-                    ci_base,
-                    ci_calc
-                )
+            _ = solve_known_mc(thi, tci, mh, mc, cph, cpc, u, area)
 
-                rows.append({
-                    "Iteration": i + 1,
-                    "Area_m2": iter_area,
-                    "T_h_in_C": thi,
-                    "T_h_out_C": result["T_h_out"],
-                    "T_c_in_C": tci,
-                    "T_c_out_C": result["T_c_out"],
-                    "U_W_m2K": u,
-                    "UA_W_K": result["UA"],
-                    "NTU": result["NTU"],
-                    "Effectiveness": result["Effectiveness"],
-                    "Q_kW": result["Q_kW"],
-                    "HX_Cost_USD": cost["updated_cost"],
-                })
-
-            df = pd.DataFrame(rows)
-
-            st.subheader("Iteration table")
-            df_display = df[
-                [
-                    "Area_m2",
-                    "T_h_in_C",
-                    "T_h_out_C",
-                    "T_c_in_C",
-                    "T_c_out_C",
-                    "Q_kW",
-                    "HX_Cost_USD",
-                ]
-            ].rename(columns={
-                "Area_m2": "Area (m²)",
-                "T_h_in_C": "Hot Inlet Temp (°C)",
-                "T_h_out_C": "Hot Outlet Temp (°C)",
-                "T_c_in_C": "Cold Inlet Temp (°C)",
-                "T_c_out_C": "Cold Outlet Temp (°C)",
-                "Q_kW": "Heat Duty (kW)",
-                "HX_Cost_USD": "HX Cost ($)",
-            })
-
-            styled_df = (
-                df_display.style
-                .apply(
-                    style_temperature_cells,
-                    axis=None,
-                    min_hot_outlet_temp=min_hot_outlet_temp,
-                    max_cold_outlet_temp=max_cold_outlet_temp,
-                )
-                .format({
-                    "Area (m²)": "{:.4f}",
-                    "Hot Inlet Temp (°C)": "{:.2f}",
-                    "Hot Outlet Temp (°C)": "{:.2f}",
-                    "Cold Inlet Temp (°C)": "{:.2f}",
-                    "Cold Outlet Temp (°C)": "{:.2f}",
-                    "Heat Duty (kW)": "{:.4f}",
-                    "HX Cost ($)": "${:,.2f}",
-                })
+            cost = calculate_shell_tube_cost(
+                area,
+                exchanger_type,
+                pressure_band,
+                material,
+                ci_base,
+                ci_calc
             )
 
-            st.dataframe(
-                styled_df,
-                use_container_width=True
-            )
-
-            st.subheader("Minimum Cost Heat Exchanger Configuration")
-
-            valid_mask = (
-                (df["T_h_out_C"] >= min_hot_outlet_temp) &
-                (df["T_c_out_C"] <= max_cold_outlet_temp)
-            )
-
-            valid_rows = df[valid_mask]
-
-            if not valid_rows.empty:
-                best_row = valid_rows.loc[valid_rows["HX_Cost_USD"].idxmin()]
-
-                result_data = pd.DataFrame({
-                    "Parameter": [
-                        "Hot fluid inlet temperature (°C)",
-                        "Hot fluid outlet temperature (°C)",
-                        "Cold fluid inlet temperature (°C)",
-                        "Cold fluid outlet temperature (°C)",
-                        "Heat Exchanger (HX) duty (kW)",
-                        "Heat Exchanger cost ($)"
-                    ],
-                    "Value": [
-                        f"{best_row['T_h_in_C']:.2f}",
-                        f"{best_row['T_h_out_C']:.2f}",
-                        f"{best_row['T_c_in_C']:.2f}",
-                        f"{best_row['T_c_out_C']:.2f}",
-                        f"{best_row['Q_kW']:.4f}",
-                        f"${best_row['HX_Cost_USD']:,.2f}"
-                    ]
-                })
-
-                st.table(result_data)
-            else:
-                st.info("No minimum cost condition reached.")
-
-            st.subheader("Heat Exchanger Cost vs Heat Duty")
-
-            base = alt.Chart(df).encode(
-                x=alt.X("Q_kW:Q", title="Heat Duty (kW)"),
-                y=alt.Y("HX_Cost_USD:Q", title="HX Cost ($)")
-            )
-
-            line = base.mark_line()
-            points = base.mark_point(filled=True, size=80)
-
-            chart = (line + points).interactive()
-
-            st.altair_chart(chart, use_container_width=True)
-
-            csv = df_display.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                label="Download results as CSV",
-                data=csv,
-                file_name="heat_exchanger_iteration_results.csv",
-                mime="text/csv"
-            )
+            st.subheader("Result")
+            st.metric("HX Cost ($)", f"${cost['updated_cost']:,.2f}")
 
     except Exception as e:
         st.error(str(e))
