@@ -414,6 +414,120 @@ def render_exchanger_inputs(hx_num, defaults):
     }
 
 
+def render_pairing_diagram(df_pairs, title):
+    if df_pairs is None or df_pairs.empty:
+        return
+
+    y_map = {
+        "Source 1": 4, "Source 2": 3, "Source 3": 2, "Source 4": 1,
+        "Sink 1": 4, "Sink 2": 3, "Sink 3": 2, "Sink 4": 1,
+    }
+
+    node_rows = []
+    for i in range(1, 5):
+        node_rows.append({
+            "label": f"Heat\nSource\n{i}",
+            "x": 0,
+            "y": y_map[f"Source {i}"],
+            "group": "source"
+        })
+        node_rows.append({
+            "label": f"Heat Sink\n{i}",
+            "x": 10,
+            "y": y_map[f"Sink {i}"],
+            "group": "sink"
+        })
+    nodes = pd.DataFrame(node_rows)
+
+    line_rows = []
+    label_rows = []
+    for _, row in df_pairs.iterrows():
+        src = row.get("Source")
+        snk = row.get("Sink")
+        hx = row.get("Exchanger", "")
+        if src not in y_map or snk not in y_map:
+            continue
+
+        y1 = y_map[src]
+        y2 = y_map[snk]
+
+        line_rows.append({
+            "x": 1.2,
+            "y": y1,
+            "x2": 8.8,
+            "y2": y2,
+            "source": src,
+            "sink": snk,
+            "hx": hx
+        })
+
+        if hx:
+            label_rows.append({
+                "x": 5.0,
+                "y": (y1 + y2) / 2.0,
+                "label": hx
+            })
+
+    if not line_rows:
+        st.info("No valid source-sink pairs available to visualize.")
+        return
+
+    lines = pd.DataFrame(line_rows)
+    labels = pd.DataFrame(label_rows)
+
+    line_chart = alt.Chart(lines).mark_rule(
+        color="#2f6f9f",
+        strokeWidth=3
+    ).encode(
+        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[-1, 11])),
+        y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5])),
+        x2="x2:Q",
+        y2="y2:Q",
+        tooltip=["source:N", "sink:N", "hx:N"]
+    )
+
+    node_chart = alt.Chart(nodes).mark_circle(
+        size=10000,
+        color="#2b638f",
+        stroke="#17384f",
+        strokeWidth=2
+    ).encode(
+        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[-1, 11])),
+        y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5]))
+    )
+
+    node_text = alt.Chart(nodes).mark_text(
+        color="white",
+        fontSize=16,
+        fontWeight="bold",
+        align="center",
+        baseline="middle",
+        lineBreak="\n"
+    ).encode(
+        x="x:Q",
+        y="y:Q",
+        text="label:N"
+    )
+
+    chart = line_chart + node_chart + node_text
+
+    if not labels.empty:
+        hx_text = alt.Chart(labels).mark_text(
+            color="#1f2933",
+            fontSize=12,
+            fontWeight="bold",
+            dy=-10
+        ).encode(
+            x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[-1, 11])),
+            y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0.5, 4.5])),
+            text="label:N"
+        )
+        chart = chart + hx_text
+
+    chart = chart.properties(title=title, height=440).configure_view(stroke=None)
+    st.altair_chart(chart, use_container_width=True)
+
+
 def reset_invalid_choice(widget_key, valid_options):
     if widget_key in st.session_state and st.session_state[widget_key] not in valid_options:
         del st.session_state[widget_key]
@@ -701,7 +815,6 @@ with tab1:
                     st.altair_chart(chart_tac, use_container_width=True)
 
                     csv = df_display.to_csv(index=False).encode("utf-8")
-                    
 
             except Exception as e:
                 st.error(str(e))
@@ -1199,6 +1312,7 @@ with tab2:
     if st.session_state.matched_results_df is not None:
         st.subheader("Matched results")
         st.dataframe(st.session_state.matched_results_df, use_container_width=True)
+        render_pairing_diagram(st.session_state.matched_results_df, "Selected source-to-sink matches")
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -1213,6 +1327,7 @@ with tab2:
     if st.session_state.optimized_results_df is not None:
         st.subheader("Optimal matched results for maximum heat integration")
         st.dataframe(st.session_state.optimized_results_df, use_container_width=True)
+        render_pairing_diagram(st.session_state.optimized_results_df, "Optimized source-to-sink matches")
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
