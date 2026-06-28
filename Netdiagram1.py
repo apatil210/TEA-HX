@@ -646,7 +646,7 @@ with tab2:
 
         selected_hx.append(hx_choice)
 
-    calculate = st.button("Calculate matched system", type="primary")
+    calculate = st.button("Calculate results for matched system")
 
     if calculate:
         results_rows = []
