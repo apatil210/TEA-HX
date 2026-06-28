@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 st.title("Heat Exchanger Matching + Cost")
-st.caption("Enter 4 heat sources and 4 heat sinks, then create a one-to-one matching.")
+st.caption("Enter 4 heat sources, 4 heat sinks, and 4 heat exchangers, then create one-to-one assignments.")
 
 
 def counterflow_effectiveness(ntu: float, cr: float) -> float:
@@ -146,21 +146,14 @@ def render_source_inputs(source_num, defaults):
             format="%.4f",
             key=f"src_mh_{source_num}"
         )
+
+    with c2:
         cph = st.number_input(
             f"Hot specific heat, c_p,h (J/kg-K) - Source {source_num}",
             min_value=1.0,
             value=defaults["cph"],
             step=10.0,
             key=f"src_cph_{source_num}"
-        )
-
-    with c2:
-        area = st.number_input(
-            f"HX area (m²) - Source {source_num}",
-            min_value=0.0001,
-            value=defaults["area"],
-            step=0.1,
-            key=f"src_area_{source_num}"
         )
         h_hot = st.number_input(
             f"h_hot (W/m²-K) - Source {source_num}",
@@ -170,76 +163,11 @@ def render_source_inputs(source_num, defaults):
             key=f"src_h_hot_{source_num}"
         )
 
-    st.markdown(f"#### Tube and cost data - Source {source_num}")
-    d1, d2, d3 = st.columns(3)
-
-    with d1:
-        tube_thickness = st.number_input(
-            f"Tube thickness, t (m) - Source {source_num}",
-            min_value=0.000001,
-            value=defaults["tube_thickness"],
-            step=0.0001,
-            format="%.6f",
-            key=f"src_tube_thickness_{source_num}"
-        )
-        tube_k = st.number_input(
-            f"Tube thermal conductivity, k (W/m-K) - Source {source_num}",
-            min_value=0.0001,
-            value=defaults["tube_k"],
-            step=0.5,
-            key=f"src_tube_k_{source_num}"
-        )
-
-    with d2:
-        exchanger_type = st.selectbox(
-            f"Exchanger type - Source {source_num}",
-            ["Floating head", "Fixed head", "U-tube", "Kettle reboiler"],
-            key=f"src_exchanger_type_{source_num}"
-        )
-        material = st.selectbox(
-            f"Material - Source {source_num}",
-            [
-                "Carbon steel (base)", "SS304", "SS316", "SS347",
-                "Nickel 200", "Monel 400", "Inconel 600",
-                "Incoloy 825", "Titanium", "Hastelloy"
-            ],
-            key=f"src_material_{source_num}"
-        )
-
-    with d3:
-        pressure_band = st.selectbox(
-            f"Pressure band - Source {source_num}",
-            ["Up to 700 kPag (base)", "700–2100 kPag", "2100–4200 kPag", "4200–6200 kPag"],
-            key=f"src_pressure_band_{source_num}"
-        )
-        ci_base = st.number_input(
-            f"Base cost index - Source {source_num}",
-            min_value=0.0001,
-            value=defaults["ci_base"],
-            step=1.0,
-            key=f"src_ci_base_{source_num}"
-        )
-        ci_calc = st.number_input(
-            f"Calculation-year cost index - Source {source_num}",
-            min_value=0.0001,
-            value=defaults["ci_calc"],
-            step=1.0,
-            key=f"src_ci_calc_{source_num}"
-        )
-
     return {
         "thi": thi,
         "mh": mh,
         "cph": cph,
-        "area": area,
         "h_hot": h_hot,
-        "tube_thickness": tube_thickness,
-        "tube_k": tube_k,
-        "exchanger_type": exchanger_type,
-        "material": material,
-        "pressure_band": pressure_band,
-        "ci_base": ci_base,
-        "ci_calc": ci_calc,
     }
 
 
@@ -286,16 +214,88 @@ def render_sink_inputs(sink_num, defaults):
     }
 
 
+def render_exchanger_inputs(hx_num, defaults):
+    st.markdown(f"### Heat Exchanger {hx_num}")
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        area = st.number_input(
+            f"HX area (m²) - HX {hx_num}",
+            min_value=0.0001,
+            value=defaults["area"],
+            step=0.1,
+            key=f"hx_area_{hx_num}"
+        )
+        tube_thickness = st.number_input(
+            f"Tube thickness, t (m) - HX {hx_num}",
+            min_value=0.000001,
+            value=defaults["tube_thickness"],
+            step=0.0001,
+            format="%.6f",
+            key=f"hx_tube_thickness_{hx_num}"
+        )
+        tube_k = st.number_input(
+            f"Tube thermal conductivity, k (W/m-K) - HX {hx_num}",
+            min_value=0.0001,
+            value=defaults["tube_k"],
+            step=0.5,
+            key=f"hx_tube_k_{hx_num}"
+        )
+
+    with c2:
+        exchanger_type = st.selectbox(
+            f"Exchanger type - HX {hx_num}",
+            ["Floating head", "Fixed head", "U-tube", "Kettle reboiler"],
+            key=f"hx_exchanger_type_{hx_num}"
+        )
+        material = st.selectbox(
+            f"Material - HX {hx_num}",
+            [
+                "Carbon steel (base)", "SS304", "SS316", "SS347",
+                "Nickel 200", "Monel 400", "Inconel 600",
+                "Incoloy 825", "Titanium", "Hastelloy"
+            ],
+            key=f"hx_material_{hx_num}"
+        )
+
+    with c3:
+        pressure_band = st.selectbox(
+            f"Pressure band - HX {hx_num}",
+            ["Up to 700 kPag (base)", "700–2100 kPag", "2100–4200 kPag", "4200–6200 kPag"],
+            key=f"hx_pressure_band_{hx_num}"
+        )
+        ci_base = st.number_input(
+            f"Base cost index - HX {hx_num}",
+            min_value=0.0001,
+            value=defaults["ci_base"],
+            step=1.0,
+            key=f"hx_ci_base_{hx_num}"
+        )
+        ci_calc = st.number_input(
+            f"Calculation-year cost index - HX {hx_num}",
+            min_value=0.0001,
+            value=defaults["ci_calc"],
+            step=1.0,
+            key=f"hx_ci_calc_{hx_num}"
+        )
+
+    return {
+        "area": area,
+        "tube_thickness": tube_thickness,
+        "tube_k": tube_k,
+        "exchanger_type": exchanger_type,
+        "material": material,
+        "pressure_band": pressure_band,
+        "ci_base": ci_base,
+        "ci_calc": ci_calc,
+    }
+
+
 source_defaults = {
     "thi": 120.0,
     "mh": 1.2,
     "cph": 2200.0,
-    "area": 20.0,
     "h_hot": 1000.0,
-    "tube_thickness": 0.001,
-    "tube_k": 15.0,
-    "ci_base": 500.0,
-    "ci_calc": 800.0,
 }
 
 sink_defaults = {
@@ -305,106 +305,110 @@ sink_defaults = {
     "h_cold": 1500.0,
 }
 
-st.markdown("## 1) Enter heat-source data")
-source_tabs = st.tabs([f"Source {i}" for i in range(1, 5)])
-sources = []
-for i, tab in enumerate(source_tabs, start=1):
-    with tab:
-        sources.append(render_source_inputs(i, source_defaults))
+hx_defaults = {
+    "area": 20.0,
+    "tube_thickness": 0.001,
+    "tube_k": 15.0,
+    "ci_base": 500.0,
+    "ci_calc": 800.0,
+}
 
-st.markdown("## 2) Enter heat-sink data")
-sink_tabs = st.tabs([f"Sink {i}" for i in range(1, 5)])
-sinks = []
-for i, tab in enumerate(sink_tabs, start=1):
-    with tab:
-        sinks.append(render_sink_inputs(i, sink_defaults))
+with st.form("hx_matching_form"):
+    st.markdown("## 1) Heat sources")
+    source_tabs = st.tabs([f"Source {i}" for i in range(1, 5)])
+    sources = []
+    for i, tab in enumerate(source_tabs, start=1):
+        with tab:
+            sources.append(render_source_inputs(i, source_defaults))
 
-st.markdown("## 3) Choose source-to-sink matching")
+    st.markdown("## 2) Heat sinks")
+    sink_tabs = st.tabs([f"Sink {i}" for i in range(1, 5)])
+    sinks = []
+    for i, tab in enumerate(sink_tabs, start=1):
+        with tab:
+            sinks.append(render_sink_inputs(i, sink_defaults))
 
-sink_labels = [f"Sink {i}" for i in range(1, 5)]
-selected_sinks = []
+    st.markdown("## 3) Heat exchangers")
+    hx_tabs = st.tabs([f"HX {i}" for i in range(1, 5)])
+    exchangers = []
+    for i, tab in enumerate(hx_tabs, start=1):
+        with tab:
+            exchangers.append(render_exchanger_inputs(i, hx_defaults))
 
-m1, m2, m3, m4 = st.columns(4)
+    st.markdown("## 4) Assign sinks and exchangers to each source")
 
-with m1:
-    match_1 = st.selectbox(
-        "Source 1 →",
-        options=sink_labels,
-        key="match_1"
-    )
-    selected_sinks.append(match_1)
+    sink_labels = [f"Sink {i}" for i in range(1, 5)]
+    hx_labels = [f"HX {i}" for i in range(1, 5)]
 
-with m2:
-    options_2 = [s for s in sink_labels if s not in selected_sinks]
-    match_2 = st.selectbox(
-        "Source 2 →",
-        options=options_2,
-        key="match_2"
-    )
-    selected_sinks.append(match_2)
+    selected_sinks = []
+    selected_hx = []
 
-with m3:
-    options_3 = [s for s in sink_labels if s not in selected_sinks]
-    match_3 = st.selectbox(
-        "Source 3 →",
-        options=options_3,
-        key="match_3"
-    )
-    selected_sinks.append(match_3)
+    for i in range(1, 5):
+        st.markdown(f"### Matching for Source {i}")
+        c1, c2 = st.columns(2)
 
-with m4:
-    options_4 = [s for s in sink_labels if s not in selected_sinks]
-    match_4 = st.selectbox(
-        "Source 4 →",
-        options=options_4,
-        key="match_4"
-    )
-    selected_sinks.append(match_4)
+        available_sinks = [s for s in sink_labels if s not in selected_sinks]
+        available_hx = [h for h in hx_labels if h not in selected_hx]
 
-matches = [match_1, match_2, match_3, match_4]
+        with c1:
+            sink_choice = st.selectbox(
+                f"Choose sink for Source {i}",
+                options=available_sinks,
+                key=f"match_sink_{i}"
+            )
 
-calculate = st.button("Calculate selected matches", type="primary")
+        with c2:
+            hx_choice = st.selectbox(
+                f"Choose exchanger for Source {i}",
+                options=available_hx,
+                key=f"match_hx_{i}"
+            )
+
+        selected_sinks.append(sink_choice)
+        selected_hx.append(hx_choice)
+
+    submitted = st.form_submit_button("Calculate matched system")
 
 
-if calculate:
+if submitted:
     results_rows = []
-    sink_index_map = {
-        "Sink 1": 0,
-        "Sink 2": 1,
-        "Sink 3": 2,
-        "Sink 4": 3,
-    }
 
-    if len(set(matches)) != 4:
+    sink_index_map = {f"Sink {i}": i - 1 for i in range(1, 5)}
+    hx_index_map = {f"HX {i}": i - 1 for i in range(1, 5)}
+
+    if len(set(selected_sinks)) != 4:
         st.error("Each source must be assigned to a unique sink.")
+    elif len(set(selected_hx)) != 4:
+        st.error("Each source must be assigned to a unique heat exchanger.")
     else:
-        for i, sink_label in enumerate(matches, start=1):
+        for i in range(1, 5):
             source = sources[i - 1]
-            sink = sinks[sink_index_map[sink_label]]
+            sink = sinks[sink_index_map[selected_sinks[i - 1]]]
+            hx = exchangers[hx_index_map[selected_hx[i - 1]]]
 
             try:
                 if source["thi"] <= sink["tci"]:
-                    st.error(f"Source {i} matched with {sink_label}: hot inlet temperature must be greater than cold inlet temperature.")
+                    st.error(f"Source {i}: hot inlet temperature must be greater than the selected sink cold inlet temperature.")
                     continue
 
-                if source["area"] <= 0:
-                    st.error(f"Source {i}: heat exchanger area must be greater than zero.")
+                if hx["area"] <= 0:
+                    st.error(f"Source {i}: exchanger area must be greater than zero.")
                     continue
 
                 if (
                     source["h_hot"] <= 0
                     or sink["h_cold"] <= 0
-                    or source["tube_thickness"] <= 0
-                    or source["tube_k"] <= 0
+                    or hx["tube_thickness"] <= 0
+                    or hx["tube_k"] <= 0
                 ):
-                    st.error(f"Source {i} matched with {sink_label}: heat transfer coefficients, tube thickness, and tube conductivity must be greater than zero.")
+                    st.error(f"Source {i}: invalid heat-transfer or tube-property input.")
                     continue
 
                 u = calculate_overall_u(
                     source["h_hot"],
                     sink["h_cold"],
-                    source["tube_thickness"],
-                    source["tube_k"]
+                    hx["tube_thickness"],
+                    hx["tube_k"]
                 )
 
                 result = solve_known_mc(
@@ -415,21 +419,22 @@ if calculate:
                     source["cph"],
                     sink["cpc"],
                     u,
-                    source["area"]
+                    hx["area"]
                 )
 
                 cost = calculate_shell_tube_cost(
-                    source["area"],
-                    source["exchanger_type"],
-                    source["pressure_band"],
-                    source["material"],
-                    source["ci_base"],
-                    source["ci_calc"]
+                    hx["area"],
+                    hx["exchanger_type"],
+                    hx["pressure_band"],
+                    hx["material"],
+                    hx["ci_base"],
+                    hx["ci_calc"]
                 )
 
                 results_rows.append({
                     "Source": f"Source {i}",
-                    "Matched sink": sink_label,
+                    "Sink": selected_sinks[i - 1],
+                    "Exchanger": selected_hx[i - 1],
                     "Hot outlet temp (°C)": f"{result['T_h_out']:.2f}",
                     "Cold outlet temp (°C)": f"{result['T_c_out']:.2f}",
                     "Heat duty (kW)": f"{result['Q_kW']:.4f}",
@@ -440,9 +445,9 @@ if calculate:
                 })
 
             except Exception as e:
-                st.error(f"Source {i} matched with {sink_label}: {str(e)}")
+                st.error(f"Source {i}: {str(e)}")
 
-        if results_rows:
-            st.subheader("Matched-pair results")
-            results_df = pd.DataFrame(results_rows)
-            st.dataframe(results_df, use_container_width=True)
+    if results_rows:
+        st.subheader("Matched results")
+        results_df = pd.DataFrame(results_rows)
+        st.dataframe(results_df, use_container_width=True)
