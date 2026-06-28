@@ -646,7 +646,7 @@ with tab2:
 
         selected_hx.append(hx_choice)
 
-    calculate = st.button("Calculate results for matched system")
+    calculate = st.button("Click to calculate results for selected pairs")
 
     if calculate:
         results_rows = []
@@ -740,7 +740,7 @@ with tab2:
 
     
 
-    optimize = st.button("Click to Optimize for maximum heat integration", type="secondary")
+    optimize = st.button("Click to optimize pairs for maximum heat integration", type="secondary")
     st.markdown("## Results")
     
     if optimize:
