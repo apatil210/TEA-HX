@@ -593,7 +593,7 @@ with tab1:
                             "Heat Exchanger capital cost ($)",
                             "Pump operating cost ($/yr)",
                             "HX annualized cost ($/yr)",
-                            "Total annual cost ($/yr)"
+                            "Total annual cost of heat integration ($/yr)"
                         ],
                         "Value": [
                             f"{best_row['T_h_in_C']:.2f}",
