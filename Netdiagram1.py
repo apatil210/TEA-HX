@@ -583,28 +583,28 @@ with tab2:
     if "optimized_feasible_count" not in st.session_state:
         st.session_state.optimized_feasible_count = None
 
-    st.markdown("## 1) Heat sources")
+    st.markdown("## Inputs for Heat sources")
     source_tabs = st.tabs([f"Source {i}" for i in range(1, 5)])
     sources = []
     for i, tab in enumerate(source_tabs, start=1):
         with tab:
             sources.append(render_source_inputs(i, source_defaults))
 
-    st.markdown("## 2) Heat sinks")
+    st.markdown("## Inputs for Heat sinks")
     sink_tabs = st.tabs([f"Sink {i}" for i in range(1, 5)])
     sinks = []
     for i, tab in enumerate(sink_tabs, start=1):
         with tab:
             sinks.append(render_sink_inputs(i, sink_defaults))
 
-    st.markdown("## 3) Heat exchangers")
+    st.markdown("## Inputs for Heat exchangers")
     hx_tabs = st.tabs([f"HX {i}" for i in range(1, 5)])
     exchangers = []
     for i, tab in enumerate(hx_tabs, start=1):
         with tab:
             exchangers.append(render_exchanger_inputs(i, hx_defaults))
 
-    st.markdown("## 4) Assign sinks and exchangers to each source")
+    st.markdown("## Assign sinks and exchangers to each source")
 
     sink_labels = [f"Sink {i}" for i in range(1, 5)]
     hx_labels = [f"HX {i}" for i in range(1, 5)]
@@ -738,13 +738,13 @@ with tab2:
                 columns=["HX cost numeric", "Heat duty numeric"]
             )
 
-    st.markdown("## 6) Optimize for Maximum Heat Integration")
+    st.markdown("## Optimize for Maximum Heat Integration")
     st.caption(
         "Automatically find the one-to-one pairing of heat sources, heat sinks, "
         "and heat exchangers that gives the maximum total heat integration."
     )
 
-    optimize = st.button("Optimize for maximum heat integration", type="secondary")
+    optimize = st.button("Click to Optimize for maximum heat integration", type="secondary")
 
     if optimize:
         best_solution = None
@@ -862,12 +862,12 @@ with tab2:
         st.subheader("Matched results")
         st.dataframe(st.session_state.matched_results_df, use_container_width=True)
 
-        st.markdown("## 5) Total cost of heat integration")
+        # st.markdown("## 5) Total cost of heat integration")
         c1, c2 = st.columns(2)
         with c1:
-            st.metric("Total cost of heat integration", f"${st.session_state.matched_total_cost:,.2f}")
+            st.metric("Total cost of heat integration for selected pairs", f"${st.session_state.matched_total_cost:,.2f}")
         with c2:
-            st.metric("Total heat integration", f"{st.session_state.matched_total_heat_duty:.4f} kW")
+            st.metric("Total heat integration for selected pairs", f"{st.session_state.matched_total_heat_duty:.4f} kW")
 
     if st.session_state.optimized_results_df is not None:
         st.subheader("Optimal matched results for maximum heat integration")
