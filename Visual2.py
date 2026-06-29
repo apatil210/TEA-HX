@@ -376,48 +376,231 @@ def render_exchanger_inputs(hx_num, defaults):
     }
 
 
-def build_shifted_composite_curve(streams, stream_type, delta_t_min=10.0):
-    segments = []
+def render_pairing_diagram(df_pairs, title):
+    if df_pairs is None or df_pairs.empty:
+        st.info("No valid source-sink pairs available to visualize.")
+        return
+
+    source_y = {
+        "Source 1": 110,
+        "Source 2": 260,
+        "Source 3": 410,
+        "Source 4": 560,
+    }
+    sink_y = {
+        "Sink 1": 110,
+        "Sink 2": 260,
+        "Sink 3": 410,
+        "Sink 4": 560,
+    }
+
+    width = 1100
+    height = 680
+    left_x = 135
+    right_x = 965
+    rx = 128
+    ry = 58
+
+    bg_color = "#ececec"
+    node_fill = "#2f6690"
+    node_stroke = "#17384f"
+    title_color = "#243746"
+    hx_text_color = "#314654"
+
+    link_colors = [
+        "#69b3d7",
+        "#5ec2c4",
+        "#8eb8e5",
+        "#7aa6d1",
+        "#62c6a6",
+        "#a08fd5",
+    ]
+
+    lane_xs = [390, 445, 500, 555]
+
+    line_parts = []
+    label_parts = []
+    shadow_parts = []
+
+    pairs = list(df_pairs.iterrows())
+
+    for idx, (_, row) in enumerate(pairs):
+        src = row.get("Source")
+        snk = row.get("Sink")
+        hx = row.get("Exchanger", "")
+
+        if src not in source_y or snk not in sink_y:
+            continue
+
+        y1 = source_y[src]
+        y2 = sink_y[snk]
+        lane_x = lane_xs[idx % len(lane_xs)]
+        color = link_colors[idx % len(link_colors)]
+
+        x_start = left_x + rx
+        x_end = right_x - rx
+
+        mid_y = (y1 + y2) / 2
+        label_y = mid_y - 10 if abs(y1 - y2) > 30 else mid_y - 18
+
+        shadow_parts.append(f"""
+        <path d="M {x_start} {y1}
+                 C {x_start + 70} {y1}, {lane_x - 20} {y1}, {lane_x} {y1}
+                 L {lane_x} {y2}
+                 C {lane_x + 20} {y2}, {x_end - 70} {y2}, {x_end} {y2}"
+              fill="none"
+              stroke="rgba(255,255,255,0.38)"
+              stroke-width="9"
+              stroke-linecap="round"
+              stroke-linejoin="round"/>
+        """)
+
+        line_parts.append(f"""
+        <path d="M {x_start} {y1}
+                 C {x_start + 70} {y1}, {lane_x - 20} {y1}, {lane_x} {y1}
+                 L {lane_x} {y2}
+                 C {lane_x + 20} {y2}, {x_end - 70} {y2}, {x_end} {y2}"
+              fill="none"
+              stroke="{color}"
+              stroke-width="5"
+              stroke-linecap="round"
+              stroke-linejoin="round"/>
+        """)
+
+        if hx:
+            label_parts.append(
+                f"""
+                <g>
+                    <rect x="{lane_x - 2}" y="{label_y - 16}" rx="10" ry="10"
+                          width="58" height="24"
+                          fill="white" fill-opacity="0.75"/>
+                    <text x="{lane_x + 27}" y="{label_y}"
+                          text-anchor="middle"
+                          font-size="13"
+                          fill="{hx_text_color}"
+                          font-weight="600">{hx}</text>
+                </g>
+                """
+            )
+
+    node_parts = []
+    for i in range(1, 5):
+        sy = source_y[f"Source {i}"]
+        ty = sink_y[f"Sink {i}"]
+
+        node_parts.append(f"""
+        <ellipse cx="{left_x}" cy="{sy}" rx="{rx}" ry="{ry}"
+                 fill="{node_fill}" stroke="{node_stroke}" stroke-width="2.5"/>
+        <text x="{left_x}" y="{sy - 18}" text-anchor="middle"
+              font-size="19" fill="white" font-weight="500">Heat</text>
+        <text x="{left_x}" y="{sy + 10}" text-anchor="middle"
+              font-size="19" fill="white" font-weight="500">Source</text>
+        <text x="{left_x}" y="{sy + 38}" text-anchor="middle"
+              font-size="19" fill="white" font-weight="500">{i}</text>
+        """)
+
+        node_parts.append(f"""
+        <ellipse cx="{right_x}" cy="{ty}" rx="{rx}" ry="{ry}"
+                 fill="{node_fill}" stroke="{node_stroke}" stroke-width="2.5"/>
+        <text x="{right_x}" y="{ty - 4}" text-anchor="middle"
+              font-size="19" fill="white" font-weight="500">Heat Sink</text>
+        <text x="{right_x}" y="{ty + 28}" text-anchor="middle"
+              font-size="19" fill="white" font-weight="500">{i}</text>
+        """)
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8"/>
+      <style>
+        body {{
+          margin: 0;
+          padding: 0;
+          background: {bg_color};
+          font-family: Arial, Helvetica, sans-serif;
+        }}
+        .wrap {{
+          width: 100%;
+          overflow-x: auto;
+          background: {bg_color};
+          border-radius: 14px;
+          padding: 10px 8px 12px 8px;
+        }}
+        svg {{
+          display: block;
+          width: 100%;
+          max-width: 1100px;
+          height: auto;
+          background: {bg_color};
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
+          <text x="36" y="42" font-size="28" font-weight="700" fill="{title_color}">{title}</text>
+          {''.join(shadow_parts)}
+          {''.join(line_parts)}
+          {''.join(label_parts)}
+          {''.join(node_parts)}
+        </svg>
+      </div>
+    </body>
+    </html>
+    """
+
+    components.html(html, height=700, scrolling=False)
+
+
+def build_composite_curve_segments(streams, stream_type, delta_t_min=10.0):
+    shifted_streams = []
+
     for stream in streams:
         if stream_type == "hot":
-            t1 = stream["Tin"] - delta_t_min / 2.0
-            t2 = stream["Tout"] - delta_t_min / 2.0
+            tin = stream["Tin"] - delta_t_min / 2.0
+            tout = stream["Tout"] - delta_t_min / 2.0
         else:
-            t1 = stream["Tin"] + delta_t_min / 2.0
-            t2 = stream["Tout"] + delta_t_min / 2.0
+            tin = stream["Tin"] + delta_t_min / 2.0
+            tout = stream["Tout"] + delta_t_min / 2.0
 
         cp = stream["mcp"]
-        t_high = max(t1, t2)
-        t_low = min(t1, t2)
-        if abs(t_high - t_low) < 1e-12 or cp <= 0:
+
+        if cp <= 0 or abs(tin - tout) < 1e-12:
             continue
-        segments.append({
-            "name": stream["name"],
-            "cp": cp,
-            "t_high": t_high,
-            "t_low": t_low,
+
+        shifted_streams.append({
+            "Tin": tin,
+            "Tout": tout,
+            "mcp": cp
         })
 
-    if not segments:
+    if not shifted_streams:
         return pd.DataFrame(columns=["Q_kW", "Shifted_T_C"])
 
-    temp_levels = sorted({s["t_high"] for s in segments} | {s["t_low"] for s in segments}, reverse=True)
-    rows = []
-    cumulative_q = 0.0
+    temp_levels = sorted(
+        {s["Tin"] for s in shifted_streams} | {s["Tout"] for s in shifted_streams},
+        reverse=True
+    )
 
-    rows.append({"Q_kW": cumulative_q, "Shifted_T_C": temp_levels[0]})
+    rows = []
+    q = 0.0
+    rows.append({"Q_kW": q, "Shifted_T_C": temp_levels[0]})
 
     for i in range(len(temp_levels) - 1):
-        upper = temp_levels[i]
-        lower = temp_levels[i + 1]
-        delta_t = upper - lower
-        active_cp = sum(
-            s["cp"] for s in segments
-            if s["t_high"] >= upper and s["t_low"] <= lower
-        )
-        dq = active_cp * delta_t / 1000.0
-        cumulative_q += dq
-        rows.append({"Q_kW": cumulative_q, "Shifted_T_C": lower})
+        t_upper = temp_levels[i]
+        t_lower = temp_levels[i + 1]
+
+        active_cp = 0.0
+        for s in shifted_streams:
+            s_high = max(s["Tin"], s["Tout"])
+            s_low = min(s["Tin"], s["Tout"])
+            if s_high >= t_upper and s_low <= t_lower:
+                active_cp += s["mcp"]
+
+        dq = active_cp * (t_upper - t_lower) / 1000.0
+        q += dq
+        rows.append({"Q_kW": q, "Shifted_T_C": t_lower})
 
     return pd.DataFrame(rows)
 
@@ -466,6 +649,98 @@ def extract_streams_for_pinch(df_pairs, sources, sinks):
     return hot_streams, cold_streams
 
 
+def interpolate_temperature(curve_df, q_value):
+    curve_df = curve_df.sort_values("Q_kW").reset_index(drop=True)
+
+    if q_value <= curve_df.loc[0, "Q_kW"]:
+        return curve_df.loc[0, "Shifted_T_C"]
+
+    if q_value >= curve_df.loc[len(curve_df) - 1, "Q_kW"]:
+        return curve_df.loc[len(curve_df) - 1, "Shifted_T_C"]
+
+    for i in range(len(curve_df) - 1):
+        q1 = curve_df.loc[i, "Q_kW"]
+        q2 = curve_df.loc[i + 1, "Q_kW"]
+        t1 = curve_df.loc[i, "Shifted_T_C"]
+        t2 = curve_df.loc[i + 1, "Shifted_T_C"]
+
+        if q1 <= q_value <= q2:
+            if abs(q2 - q1) < 1e-12:
+                return t1
+            frac = (q_value - q1) / (q2 - q1)
+            return t1 + frac * (t2 - t1)
+
+    return curve_df.loc[len(curve_df) - 1, "Shifted_T_C"]
+
+
+def find_required_cold_shift(hot_curve, cold_curve):
+    q_candidates = sorted(set(hot_curve["Q_kW"].tolist() + cold_curve["Q_kW"].tolist()))
+    max_hot_q = hot_curve["Q_kW"].max()
+    max_cold_q = cold_curve["Q_kW"].max()
+
+    best_shift = None
+    best_min_gap = None
+
+    shift_grid = [i * max(max_hot_q, max_cold_q) / 800.0 for i in range(801)]
+
+    for shift in shift_grid:
+        overlap_q = [q for q in q_candidates if 0 <= q - shift <= max_cold_q and 0 <= q <= max_hot_q]
+        if not overlap_q:
+            continue
+
+        gaps = []
+        for q in overlap_q:
+            th = interpolate_temperature(hot_curve, q)
+            tc = interpolate_temperature(cold_curve, q - shift)
+            gaps.append(th - tc)
+
+        min_gap = min(gaps)
+
+        if min_gap >= -1e-6:
+            best_shift = shift
+            best_min_gap = min_gap
+            break
+
+    if best_shift is None:
+        best_shift = 0.0
+        best_min_gap = None
+
+    return best_shift, best_min_gap
+
+
+def find_pinch_point(hot_curve, cold_curve, cold_shift):
+    q_candidates = sorted(
+        set(hot_curve["Q_kW"].tolist() + [q + cold_shift for q in cold_curve["Q_kW"].tolist()])
+    )
+
+    max_hot_q = hot_curve["Q_kW"].max()
+    max_cold_q = cold_curve["Q_kW"].max()
+
+    overlap_q = [q for q in q_candidates if 0 <= q <= max_hot_q and 0 <= q - cold_shift <= max_cold_q]
+
+    if not overlap_q:
+        return None
+
+    best = None
+    best_gap = None
+
+    for q in overlap_q:
+        th = interpolate_temperature(hot_curve, q)
+        tc = interpolate_temperature(cold_curve, q - cold_shift)
+        gap = th - tc
+
+        if best is None or gap < best_gap:
+            best = {
+                "Q_kW": q,
+                "Hot_T": th,
+                "Cold_T": tc,
+                "Gap": gap
+            }
+            best_gap = gap
+
+    return best
+
+
 def render_pinch_curves(df_pairs, title, sources, sinks, delta_t_min=10.0):
     if df_pairs is None or df_pairs.empty:
         st.info("No valid source-sink pairs available to visualize.")
@@ -474,42 +749,29 @@ def render_pinch_curves(df_pairs, title, sources, sinks, delta_t_min=10.0):
     hot_streams, cold_streams = extract_streams_for_pinch(df_pairs, sources, sinks)
 
     if not hot_streams or not cold_streams:
-        st.info("Insufficient stream data to build shifted composite curves.")
+        st.info("Insufficient stream data to build composite curves.")
         return
 
-    hot_curve = build_shifted_composite_curve(hot_streams, "hot", delta_t_min=delta_t_min)
-    cold_curve = build_shifted_composite_curve(cold_streams, "cold", delta_t_min=delta_t_min)
+    hot_curve = build_composite_curve_segments(hot_streams, "hot", delta_t_min=delta_t_min)
+    cold_curve = build_composite_curve_segments(cold_streams, "cold", delta_t_min=delta_t_min)
 
     if hot_curve.empty or cold_curve.empty:
-        st.info("Unable to construct shifted composite curves for the selected streams.")
+        st.info("Unable to construct composite curves for the selected streams.")
         return
 
-    hot_curve = hot_curve.copy()
-    cold_curve = cold_curve.copy()
+    cold_shift, min_gap = find_required_cold_shift(hot_curve, cold_curve)
+    pinch = find_pinch_point(hot_curve, cold_curve, cold_shift)
 
-    hot_curve["Curve"] = "Hot composite curve"
-    cold_curve["Curve"] = "Cold composite curve"
-    hot_curve["Q_plot"] = hot_curve["Q_kW"] / 1000.0
-    cold_curve["Q_plot"] = cold_curve["Q_kW"] / 1000.0
+    hot_plot = hot_curve.copy()
+    cold_plot = cold_curve.copy()
 
-    combined = pd.concat([hot_curve, cold_curve], ignore_index=True)
+    hot_plot["Q_plot"] = hot_plot["Q_kW"] / 1000.0
+    cold_plot["Q_plot"] = (cold_plot["Q_kW"] + cold_shift) / 1000.0
 
-    q_values_kw = sorted(set(hot_curve["Q_kW"].tolist() + cold_curve["Q_kW"].tolist()))
-    hot_interp = pd.DataFrame({"Q_kW": q_values_kw})
-    cold_interp = pd.DataFrame({"Q_kW": q_values_kw})
-    hot_interp["Q_plot"] = hot_interp["Q_kW"] / 1000.0
-    cold_interp["Q_plot"] = cold_interp["Q_kW"] / 1000.0
+    hot_plot["Curve"] = "Hot composite curve"
+    cold_plot["Curve"] = "Cold composite curve"
 
-    hot_interp["Shifted_T_C"] = hot_interp["Q_kW"].apply(
-        lambda q: float(pd.Series(hot_curve["Shifted_T_C"]).iloc[(hot_curve["Q_kW"] - q).abs().argsort().iloc[0]])
-    )
-    cold_interp["Shifted_T_C"] = cold_interp["Q_kW"].apply(
-        lambda q: float(pd.Series(cold_curve["Shifted_T_C"]).iloc[(cold_curve["Q_kW"] - q).abs().argsort().iloc[0]])
-    )
-
-    delta_df = hot_interp.merge(cold_interp, on=["Q_kW", "Q_plot"], suffixes=("_hot", "_cold"))
-    delta_df["Approach_C"] = delta_df["Shifted_T_C_hot"] - delta_df["Shifted_T_C_cold"]
-    pinch_row = delta_df.loc[delta_df["Approach_C"].idxmin()]
+    combined = pd.concat([hot_plot, cold_plot], ignore_index=True)
 
     base = alt.Chart(combined).encode(
         x=alt.X(
@@ -529,7 +791,7 @@ def render_pinch_curves(df_pairs, title, sources, sinks, delta_t_min=10.0):
         ),
         y=alt.Y(
             "Shifted_T_C:Q",
-            title="Temperature (°C)",
+            title="Shifted Temperature (°C)",
             axis=alt.Axis(
                 grid=True,
                 gridColor="#d9d9d9",
@@ -573,43 +835,49 @@ def render_pinch_curves(df_pairs, title, sources, sinks, delta_t_min=10.0):
         tooltip=[
             alt.Tooltip("Curve:N"),
             alt.Tooltip("Q_plot:Q", format=".4f", title="Duty (MW)"),
-            alt.Tooltip("Shifted_T_C:Q", format=".2f", title="Temperature (°C)")
+            alt.Tooltip("Shifted_T_C:Q", format=".2f", title="Shifted Temperature (°C)")
         ]
     )
 
-    pinch_marker = alt.Chart(pd.DataFrame([{
-        "Q_plot": pinch_row["Q_plot"],
-        "Shifted_T_C": (pinch_row["Shifted_T_C_hot"] + pinch_row["Shifted_T_C_cold"]) / 2.0,
-        "Label": f"Pinch ≈ {pinch_row['Approach_C']:.2f} °C"
-    }])).mark_point(
-        shape="diamond",
-        size=130,
-        filled=True,
-        color="black"
-    ).encode(
-        x="Q_plot:Q",
-        y="Shifted_T_C:Q",
-        tooltip=["Label:N", alt.Tooltip("Q_plot:Q", format=".4f", title="Duty (MW)")]
-    )
+    layers = [lines, points]
 
-    pinch_text = alt.Chart(pd.DataFrame([{
-        "Q_plot": pinch_row["Q_plot"],
-        "Shifted_T_C": (pinch_row["Shifted_T_C_hot"] + pinch_row["Shifted_T_C_cold"]) / 2.0,
-        "Label": "Pinch"
-    }])).mark_text(
-        dx=10,
-        dy=-10,
-        fontSize=12,
-        color="black",
-        fontWeight="bold",
-        align="left"
-    ).encode(
-        x="Q_plot:Q",
-        y="Shifted_T_C:Q",
-        text="Label:N"
-    )
+    if pinch is not None:
+        pinch_df = pd.DataFrame([{
+            "Q_plot": pinch["Q_kW"] / 1000.0,
+            "Shifted_T_C": pinch["Hot_T"],
+            "Label": f"Pinch, gap ≈ {pinch['Gap']:.2f} °C"
+        }])
 
-    chart = (lines + points + pinch_marker + pinch_text).properties(
+        pinch_marker = alt.Chart(pinch_df).mark_point(
+            shape="diamond",
+            size=120,
+            filled=True,
+            color="black"
+        ).encode(
+            x="Q_plot:Q",
+            y="Shifted_T_C:Q",
+            tooltip=[
+                "Label:N",
+                alt.Tooltip("Q_plot:Q", format=".4f", title="Duty (MW)")
+            ]
+        )
+
+        pinch_text = alt.Chart(pinch_df).mark_text(
+            dx=10,
+            dy=-10,
+            fontSize=12,
+            color="black",
+            fontWeight="bold",
+            align="left"
+        ).encode(
+            x="Q_plot:Q",
+            y="Shifted_T_C:Q",
+            text=alt.value("Pinch")
+        )
+
+        layers.extend([pinch_marker, pinch_text])
+
+    chart = alt.layer(*layers).properties(
         title=title,
         height=560
     ).configure_view(
@@ -629,23 +897,22 @@ def render_pinch_curves(df_pairs, title, sources, sinks, delta_t_min=10.0):
 
     st.altair_chart(chart, use_container_width=True)
 
-    total_hot_q = hot_curve["Q_kW"].max() / 1000.0
-    total_cold_q = cold_curve["Q_kW"].max() / 1000.0
-
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.metric("ΔTmin used", f"{delta_t_min:.1f} °C")
     with c2:
-        st.metric("Hot composite load", f"{total_hot_q:.4f} MW")
+        st.metric("Hot composite load", f"{hot_curve['Q_kW'].max() / 1000.0:.4f} MW")
     with c3:
-        st.metric("Cold composite load", f"{total_cold_q:.4f} MW")
+        st.metric("Cold composite load", f"{cold_curve['Q_kW'].max() / 1000.0:.4f} MW")
     with c4:
-        st.metric("Minimum shifted approach", f"{pinch_row['Approach_C']:.2f} °C")
+        if pinch is not None:
+            st.metric("Pinch approach", f"{pinch['Gap']:.2f} °C")
+        else:
+            st.metric("Pinch approach", "N/A")
 
     st.caption(
-        "Styled to match a classic pinch-composite graph: red hot curve, blue cold curve, dashed grid, and bottom legend."
+        "Literature-style shifted composite curves: the cold composite curve is horizontally shifted until it touches the hot composite curve at the pinch."
     )
-
 
 def reset_invalid_choice(widget_key, valid_options):
     if widget_key in st.session_state and st.session_state[widget_key] not in valid_options:
@@ -1246,7 +1513,7 @@ with tab2:
     if st.session_state.matched_results_df is not None:
         st.subheader("Matched results")
         st.dataframe(st.session_state.matched_results_df, use_container_width=True)
-        render_pinch_curves(st.session_state.matched_results_df, "Selected matched pairs — shifted composite curves", sources, sinks, delta_t_min=10.0)
+        render_pairing_diagram(st.session_state.matched_results_df, "Selected source-to-sink matches")
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -1261,7 +1528,7 @@ with tab2:
     if st.session_state.optimized_results_df is not None:
         st.subheader("Optimal matched results for maximum heat integration")
         st.dataframe(st.session_state.optimized_results_df, use_container_width=True)
-        render_pinch_curves(st.session_state.optimized_results_df, "Optimized matched pairs — shifted composite curves", sources, sinks, delta_t_min=10.0)
+        render_pairing_diagram(st.session_state.optimized_results_df, "Optimized source-to-sink matches")
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
