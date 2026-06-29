@@ -623,8 +623,8 @@ def render_pinch_curves(df_pairs, title, sources, sinks, delta_t_min=10.0):
     ).configure_legend(
         orient="bottom",
         direction="horizontal"
-    ).configure_background(
-        color="white"
+    ).configure(
+        background="white"
     )
 
     st.altair_chart(chart, use_container_width=True)
