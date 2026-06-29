@@ -484,17 +484,21 @@ def render_pinch_curves(df_pairs, title, sources, sinks, delta_t_min=10.0):
         st.info("Unable to construct shifted composite curves for the selected streams.")
         return
 
-    hot_curve["Curve"] = "Hot composite"
-    cold_curve["Curve"] = "Cold composite"
-
+    hot_curve = hot_curve.copy()
     cold_curve = cold_curve.copy()
-    cold_curve["Q_kW"] = cold_curve["Q_kW"] + 0.0
+
+    hot_curve["Curve"] = "Hot composite curve"
+    cold_curve["Curve"] = "Cold composite curve"
+    hot_curve["Q_plot"] = hot_curve["Q_kW"] / 1000.0
+    cold_curve["Q_plot"] = cold_curve["Q_kW"] / 1000.0
 
     combined = pd.concat([hot_curve, cold_curve], ignore_index=True)
 
-    q_values = sorted(set(hot_curve["Q_kW"].tolist() + cold_curve["Q_kW"].tolist()))
-    hot_interp = pd.DataFrame({"Q_kW": q_values})
-    cold_interp = pd.DataFrame({"Q_kW": q_values})
+    q_values_kw = sorted(set(hot_curve["Q_kW"].tolist() + cold_curve["Q_kW"].tolist()))
+    hot_interp = pd.DataFrame({"Q_kW": q_values_kw})
+    cold_interp = pd.DataFrame({"Q_kW": q_values_kw})
+    hot_interp["Q_plot"] = hot_interp["Q_kW"] / 1000.0
+    cold_interp["Q_plot"] = cold_interp["Q_kW"] / 1000.0
 
     hot_interp["Shifted_T_C"] = hot_interp["Q_kW"].apply(
         lambda q: float(pd.Series(hot_curve["Shifted_T_C"]).iloc[(hot_curve["Q_kW"] - q).abs().argsort().iloc[0]])
@@ -503,82 +507,143 @@ def render_pinch_curves(df_pairs, title, sources, sinks, delta_t_min=10.0):
         lambda q: float(pd.Series(cold_curve["Shifted_T_C"]).iloc[(cold_curve["Q_kW"] - q).abs().argsort().iloc[0]])
     )
 
-    delta_df = hot_interp.merge(cold_interp, on="Q_kW", suffixes=("_hot", "_cold"))
+    delta_df = hot_interp.merge(cold_interp, on=["Q_kW", "Q_plot"], suffixes=("_hot", "_cold"))
     delta_df["Approach_C"] = delta_df["Shifted_T_C_hot"] - delta_df["Shifted_T_C_cold"]
     pinch_row = delta_df.loc[delta_df["Approach_C"].idxmin()]
 
     base = alt.Chart(combined).encode(
-        x=alt.X("Q_kW:Q", title="Cumulative Heat Load (kW)"),
-        y=alt.Y("Shifted_T_C:Q", title="Shifted Temperature (°C)"),
+        x=alt.X(
+            "Q_plot:Q",
+            title="Duty (MW)",
+            axis=alt.Axis(
+                grid=True,
+                gridColor="#d9d9d9",
+                gridDash=[6, 6],
+                tickColor="black",
+                domainColor="black",
+                labelColor="black",
+                titleColor="black",
+                labelFontSize=12,
+                titleFontSize=16
+            )
+        ),
+        y=alt.Y(
+            "Shifted_T_C:Q",
+            title="Temperature (°C)",
+            axis=alt.Axis(
+                grid=True,
+                gridColor="#d9d9d9",
+                gridDash=[6, 6],
+                tickColor="black",
+                domainColor="black",
+                labelColor="black",
+                titleColor="black",
+                labelFontSize=12,
+                titleFontSize=16
+            )
+        ),
         color=alt.Color(
             "Curve:N",
-            scale=alt.Scale(domain=["Hot composite", "Cold composite"], range=["#c2410c", "#2563eb"]),
-            legend=alt.Legend(title=None, orient="top")
+            scale=alt.Scale(
+                domain=["Cold composite curve", "Hot composite curve"],
+                range=["#3b1fb3", "#ff1f1f"]
+            ),
+            legend=alt.Legend(
+                title=None,
+                orient="bottom",
+                direction="horizontal",
+                labelFontSize=13,
+                symbolSize=140
+            )
         ),
+        shape=alt.Shape(
+            "Curve:N",
+            scale=alt.Scale(
+                domain=["Cold composite curve", "Hot composite curve"],
+                range=["triangle", "circle"]
+            ),
+            legend=None
+        )
+    )
+
+    lines = base.mark_line(strokeWidth=1.6).encode(detail="Curve:N")
+
+    points = base.mark_point(filled=True, size=70).encode(
+        detail="Curve:N",
         tooltip=[
             alt.Tooltip("Curve:N"),
-            alt.Tooltip("Q_kW:Q", format=".4f", title="Cumulative heat (kW)"),
-            alt.Tooltip("Shifted_T_C:Q", format=".2f", title="Shifted temperature (°C)")
+            alt.Tooltip("Q_plot:Q", format=".4f", title="Duty (MW)"),
+            alt.Tooltip("Shifted_T_C:Q", format=".2f", title="Temperature (°C)")
         ]
     )
 
-    lines = base.mark_line(strokeWidth=4, point=True)
-
-    pinch_point = alt.Chart(pd.DataFrame([{
-        "Q_kW": pinch_row["Q_kW"],
+    pinch_marker = alt.Chart(pd.DataFrame([{
+        "Q_plot": pinch_row["Q_plot"],
         "Shifted_T_C": (pinch_row["Shifted_T_C_hot"] + pinch_row["Shifted_T_C_cold"]) / 2.0,
-        "Label": f"Pinch approach ≈ {pinch_row['Approach_C']:.2f} °C"
-    }])).mark_point(size=180, filled=True, color="#7c3aed").encode(
-        x="Q_kW:Q",
+        "Label": f"Pinch ≈ {pinch_row['Approach_C']:.2f} °C"
+    }])).mark_point(
+        shape="diamond",
+        size=130,
+        filled=True,
+        color="black"
+    ).encode(
+        x="Q_plot:Q",
         y="Shifted_T_C:Q",
-        tooltip=["Label:N", alt.Tooltip("Q_kW:Q", format=".4f")]
+        tooltip=["Label:N", alt.Tooltip("Q_plot:Q", format=".4f", title="Duty (MW)")]
     )
 
     pinch_text = alt.Chart(pd.DataFrame([{
-        "Q_kW": pinch_row["Q_kW"],
+        "Q_plot": pinch_row["Q_plot"],
         "Shifted_T_C": (pinch_row["Shifted_T_C_hot"] + pinch_row["Shifted_T_C_cold"]) / 2.0,
-        "Label": f"Pinch ({pinch_row['Approach_C']:.2f} °C)"
-    }])).mark_text(dx=10, dy=-10, fontSize=12, fontWeight="bold", color="#6d28d9", align="left").encode(
-        x="Q_kW:Q",
+        "Label": "Pinch"
+    }])).mark_text(
+        dx=10,
+        dy=-10,
+        fontSize=12,
+        color="black",
+        fontWeight="bold",
+        align="left"
+    ).encode(
+        x="Q_plot:Q",
         y="Shifted_T_C:Q",
         text="Label:N"
     )
 
-    chart = (lines + pinch_point + pinch_text).properties(
-        title=f"{title} (ΔTmin = {delta_t_min:.0f} °C)",
-        height=520
+    chart = (lines + points + pinch_marker + pinch_text).properties(
+        title=title,
+        height=560
     ).configure_view(
-        strokeOpacity=0
-    ).configure_axis(
-        grid=True,
-        gridColor="#e5e7eb",
-        domainColor="#cbd5e1",
-        tickColor="#94a3b8",
-        labelColor="#334155",
-        titleColor="#0f172a"
+        stroke="black",
+        strokeWidth=1,
+        fill="white"
     ).configure_title(
-        anchor="start",
+        anchor="middle",
         fontSize=18,
-        color="#0f172a"
+        color="black"
+    ).configure_legend(
+        orient="bottom",
+        direction="horizontal"
+    ).configure_background(
+        color="white"
     )
 
     st.altair_chart(chart, use_container_width=True)
 
-    total_hot_q = hot_curve["Q_kW"].max()
-    total_cold_q = cold_curve["Q_kW"].max()
+    total_hot_q = hot_curve["Q_kW"].max() / 1000.0
+    total_cold_q = cold_curve["Q_kW"].max() / 1000.0
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.metric("ΔTmin used", f"{delta_t_min:.1f} °C")
     with c2:
-        st.metric("Hot composite load", f"{total_hot_q:.4f} kW")
+        st.metric("Hot composite load", f"{total_hot_q:.4f} MW")
     with c3:
-        st.metric("Cold composite load", f"{total_cold_q:.4f} kW")
+        st.metric("Cold composite load", f"{total_cold_q:.4f} MW")
     with c4:
         st.metric("Minimum shifted approach", f"{pinch_row['Approach_C']:.2f} °C")
 
     st.caption(
-        "Shifted composite curves are constructed using a constant ΔTmin of 10 °C, with hot streams shifted down by 5 °C and cold streams shifted up by 5 °C."
+        "Styled to match a classic pinch-composite graph: red hot curve, blue cold curve, dashed grid, and bottom legend."
     )
 
 
@@ -1181,13 +1246,7 @@ with tab2:
     if st.session_state.matched_results_df is not None:
         st.subheader("Matched results")
         st.dataframe(st.session_state.matched_results_df, use_container_width=True)
-        render_pinch_curves(
-            st.session_state.matched_results_df,
-            "Selected matched pairs — shifted composite curves",
-            sources,
-            sinks,
-            delta_t_min=10.0
-        )
+        render_pinch_curves(st.session_state.matched_results_df, "Selected matched pairs — shifted composite curves", sources, sinks, delta_t_min=10.0)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -1202,13 +1261,7 @@ with tab2:
     if st.session_state.optimized_results_df is not None:
         st.subheader("Optimal matched results for maximum heat integration")
         st.dataframe(st.session_state.optimized_results_df, use_container_width=True)
-        render_pinch_curves(
-            st.session_state.optimized_results_df,
-            "Optimized matched pairs — shifted composite curves",
-            sources,
-            sinks,
-            delta_t_min=10.0
-        )
+        render_pinch_curves(st.session_state.optimized_results_df, "Optimized matched pairs — shifted composite curves", sources, sinks, delta_t_min=10.0)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
