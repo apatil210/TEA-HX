@@ -382,45 +382,78 @@ def render_pairing_diagram(df_pairs, title):
         return
 
     source_y = {
-        "Source 1": 110,
-        "Source 2": 260,
-        "Source 3": 410,
-        "Source 4": 560,
+        "Source 1": 120,
+        "Source 2": 250,
+        "Source 3": 380,
+        "Source 4": 510,
     }
+
     sink_y = {
-        "Sink 1": 110,
-        "Sink 2": 260,
-        "Sink 3": 410,
-        "Sink 4": 560,
+        "Sink 1": 120,
+        "Sink 2": 250,
+        "Sink 3": 380,
+        "Sink 4": 510,
     }
 
-    width = 1100
-    height = 680
-    left_x = 135
-    right_x = 965
-    rx = 128
-    ry = 58
+    width = 1180
+    height = 660
 
-    bg_color = "#ececec"
-    node_fill = "#2f6690"
-    node_stroke = "#17384f"
-    title_color = "#243746"
-    hx_text_color = "#314654"
+    left_x = 120
+    right_x = 1060
+    card_w = 184
+    card_h = 76
+    lane_xs = [435, 505, 575, 645]
+
+    bg = "#f4f7fb"
+    board_bg = "#f8fbfd"
+    panel = "#ffffff"
+    lane_fill = "#f1f6fb"
+    grid = "#e9f0f6"
+    border = "#d6e0ea"
+    text = "#14202b"
+    muted = "#607284"
+    source_accent = "#0f766e"
+    sink_accent = "#2563eb"
 
     link_colors = [
-        "#69b3d7",
-        "#5ec2c4",
-        "#8eb8e5",
-        "#7aa6d1",
-        "#62c6a6",
-        "#a08fd5",
+        "#0f766e",
+        "#2563eb",
+        "#7c3aed",
+        "#ea580c",
+        "#0891b2",
+        "#be185d",
     ]
 
-    lane_xs = [390, 445, 500, 555]
+    def draw_card(x, y, eyebrow, label, number, accent_color, stroke_color):
+        top_y = y - card_h / 2
+        left = x - card_w / 2
+        return f"""
+        <g>
+            <rect x="{left}" y="{top_y}" width="{card_w}" height="{card_h}"
+                  rx="22" fill="{panel}" stroke="{stroke_color}" stroke-width="1.4"/>
+            <rect x="{left + 12}" y="{top_y + 12}" width="8" height="{card_h - 24}"
+                  rx="4" fill="{accent_color}"/>
+            <text x="{left + 34}" y="{top_y + 28}"
+                  font-size="12" font-weight="700" letter-spacing="0.12em"
+                  fill="{muted}">{eyebrow.upper()}</text>
+            <text x="{left + 34}" y="{top_y + 54}"
+                  font-size="22" font-weight="800" fill="{text}">{label} {number}</text>
+        </g>
+        """
 
-    line_parts = []
-    label_parts = []
-    shadow_parts = []
+    grid_lines = []
+    for gx in range(70, width, 80):
+        grid_lines.append(
+            f'<line x1="{gx}" y1="70" x2="{gx}" y2="{height - 40}" stroke="{grid}" stroke-width="1"/>'
+        )
+    for gy in range(80, height, 80):
+        grid_lines.append(
+            f'<line x1="50" y1="{gy}" x2="{width - 50}" y2="{gy}" stroke="{grid}" stroke-width="1"/>'
+        )
+
+    glow_parts = []
+    connector_parts = []
+    badge_parts = []
 
     pairs = list(df_pairs.iterrows())
 
@@ -437,120 +470,249 @@ def render_pairing_diagram(df_pairs, title):
         lane_x = lane_xs[idx % len(lane_xs)]
         color = link_colors[idx % len(link_colors)]
 
-        x_start = left_x + rx
-        x_end = right_x - rx
+        x_start = left_x + card_w / 2
+        x_end = right_x - card_w / 2
+
+        path_d = (
+            f"M {x_start} {y1} "
+            f"C {x_start + 72} {y1}, {lane_x - 44} {y1}, {lane_x} {y1} "
+            f"L {lane_x} {y2} "
+            f"C {lane_x + 44} {y2}, {x_end - 72} {y2}, {x_end} {y2}"
+        )
 
         mid_y = (y1 + y2) / 2
-        label_y = mid_y - 10 if abs(y1 - y2) > 30 else mid_y - 18
+        badge_y = mid_y - 18 if abs(y1 - y2) > 24 else mid_y - 28
 
-        shadow_parts.append(f"""
-        <path d="M {x_start} {y1}
-                 C {x_start + 70} {y1}, {lane_x - 20} {y1}, {lane_x} {y1}
-                 L {lane_x} {y2}
-                 C {lane_x + 20} {y2}, {x_end - 70} {y2}, {x_end} {y2}"
-              fill="none"
-              stroke="rgba(255,255,255,0.38)"
-              stroke-width="9"
-              stroke-linecap="round"
-              stroke-linejoin="round"/>
-        """)
+        glow_parts.append(
+            f'<path d="{path_d}" fill="none" stroke="{color}" stroke-opacity="0.12" '
+            f'stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>'
+        )
 
-        line_parts.append(f"""
-        <path d="M {x_start} {y1}
-                 C {x_start + 70} {y1}, {lane_x - 20} {y1}, {lane_x} {y1}
-                 L {lane_x} {y2}
-                 C {lane_x + 20} {y2}, {x_end - 70} {y2}, {x_end} {y2}"
-              fill="none"
-              stroke="{color}"
-              stroke-width="5"
-              stroke-linecap="round"
-              stroke-linejoin="round"/>
-        """)
+        connector_parts.append(
+            f'<path d="{path_d}" fill="none" stroke="{color}" stroke-width="4.5" '
+            f'stroke-linecap="round" stroke-linejoin="round"/>'
+        )
 
         if hx:
-            label_parts.append(
+            badge_parts.append(
                 f"""
                 <g>
-                    <rect x="{lane_x - 2}" y="{label_y - 16}" rx="10" ry="10"
-                          width="58" height="24"
-                          fill="white" fill-opacity="0.75"/>
-                    <text x="{lane_x + 27}" y="{label_y}"
-                          text-anchor="middle"
-                          font-size="13"
-                          fill="{hx_text_color}"
-                          font-weight="600">{hx}</text>
+                    <rect x="{lane_x - 38}" y="{badge_y - 12}" width="76" height="28"
+                          rx="14" fill="{panel}" stroke="{border}" stroke-width="1.2"/>
+                    <text x="{lane_x}" y="{badge_y + 6}" text-anchor="middle"
+                          font-size="13" font-weight="800" fill="{text}">{hx}</text>
                 </g>
                 """
             )
 
-    node_parts = []
+    source_cards = []
+    sink_cards = []
+
     for i in range(1, 5):
-        sy = source_y[f"Source {i}"]
-        ty = sink_y[f"Sink {i}"]
-
-        node_parts.append(f"""
-        <ellipse cx="{left_x}" cy="{sy}" rx="{rx}" ry="{ry}"
-                 fill="{node_fill}" stroke="{node_stroke}" stroke-width="2.5"/>
-        <text x="{left_x}" y="{sy - 18}" text-anchor="middle"
-              font-size="19" fill="white" font-weight="500">Heat</text>
-        <text x="{left_x}" y="{sy + 10}" text-anchor="middle"
-              font-size="19" fill="white" font-weight="500">Source</text>
-        <text x="{left_x}" y="{sy + 38}" text-anchor="middle"
-              font-size="19" fill="white" font-weight="500">{i}</text>
-        """)
-
-        node_parts.append(f"""
-        <ellipse cx="{right_x}" cy="{ty}" rx="{rx}" ry="{ry}"
-                 fill="{node_fill}" stroke="{node_stroke}" stroke-width="2.5"/>
-        <text x="{right_x}" y="{ty - 4}" text-anchor="middle"
-              font-size="19" fill="white" font-weight="500">Heat Sink</text>
-        <text x="{right_x}" y="{ty + 28}" text-anchor="middle"
-              font-size="19" fill="white" font-weight="500">{i}</text>
-        """)
+        source_cards.append(
+            draw_card(
+                left_x,
+                source_y[f"Source {i}"],
+                "Heat",
+                "Source",
+                str(i),
+                source_accent,
+                "#b9d8d3",
+            )
+        )
+        sink_cards.append(
+            draw_card(
+                right_x,
+                sink_y[f"Sink {i}"],
+                "Heat",
+                "Sink",
+                str(i),
+                sink_accent,
+                "#c9d8fb",
+            )
+        )
 
     html = f"""
     <!DOCTYPE html>
     <html>
     <head>
-      <meta charset="utf-8"/>
-      <style>
-        body {{
-          margin: 0;
-          padding: 0;
-          background: {bg_color};
-          font-family: Arial, Helvetica, sans-serif;
-        }}
-        .wrap {{
-          width: 100%;
-          overflow-x: auto;
-          background: {bg_color};
-          border-radius: 14px;
-          padding: 10px 8px 12px 8px;
-        }}
-        svg {{
-          display: block;
-          width: 100%;
-          max-width: 1100px;
-          height: auto;
-          background: {bg_color};
-        }}
-      </style>
+        <meta charset="utf-8" />
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+            html, body {{
+                margin: 0;
+                padding: 0;
+                background: {bg};
+                font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            }}
+
+            * {{
+                box-sizing: border-box;
+            }}
+
+            .frame {{
+                width: 100%;
+                padding: 14px;
+                background: {bg};
+            }}
+
+            .board {{
+                width: 100%;
+                max-width: 1160px;
+                margin: 0 auto;
+                background: linear-gradient(180deg, #fbfdff 0%, {board_bg} 100%);
+                border: 1px solid {border};
+                border-radius: 28px;
+                overflow: hidden;
+                box-shadow:
+                    0 1px 2px rgba(16, 24, 40, 0.03),
+                    0 16px 40px rgba(16, 24, 40, 0.08);
+            }}
+
+            .header {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                padding: 18px 24px 16px 24px;
+                border-bottom: 1px solid #e7eef5;
+                background: rgba(255, 255, 255, 0.80);
+                backdrop-filter: blur(6px);
+            }}
+
+            .title-wrap {{
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }}
+
+            .eyebrow {{
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: {muted};
+            }}
+
+            .title {{
+                font-size: 22px;
+                line-height: 1.1;
+                font-weight: 800;
+                color: {text};
+            }}
+
+            .legend {{
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                justify-content: flex-end;
+            }}
+
+            .pill {{
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 12px;
+                border-radius: 999px;
+                background: {panel};
+                border: 1px solid #e4ebf3;
+                color: {muted};
+                font-size: 12px;
+                font-weight: 700;
+            }}
+
+            .dot {{
+                width: 10px;
+                height: 10px;
+                border-radius: 999px;
+                flex: 0 0 10px;
+            }}
+
+            svg {{
+                display: block;
+                width: 100%;
+                height: auto;
+            }}
+
+            .section-label {{
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                fill: {muted};
+            }}
+
+            .lane-label {{
+                font-size: 13px;
+                font-weight: 700;
+                fill: #6c7d8d;
+            }}
+
+            @media (max-width: 900px) {{
+                .header {{
+                    flex-direction: column;
+                    align-items: flex-start;
+                }}
+
+                .legend {{
+                    justify-content: flex-start;
+                }}
+            }}
+        </style>
     </head>
     <body>
-      <div class="wrap">
-        <svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
-          <text x="36" y="42" font-size="28" font-weight="700" fill="{title_color}">{title}</text>
-          {''.join(shadow_parts)}
-          {''.join(line_parts)}
-          {''.join(label_parts)}
-          {''.join(node_parts)}
-        </svg>
-      </div>
+        <div class="frame">
+            <div class="board">
+                <div class="header">
+                    <div class="title-wrap">
+                        <div class="eyebrow">Network overview</div>
+                        <div class="title">{title}</div>
+                    </div>
+
+                    <div class="legend">
+                        <div class="pill">
+                            <span class="dot" style="background:{source_accent};"></span>
+                            Heat sources
+                        </div>
+                        <div class="pill">
+                            <span class="dot" style="background:{sink_accent};"></span>
+                            Heat sinks
+                        </div>
+                        <div class="pill">
+                            <span class="dot" style="background:#7c3aed;"></span>
+                            Exchange paths
+                        </div>
+                    </div>
+                </div>
+
+                <svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0" y="0" width="{width}" height="{height}" fill="{bg}"/>
+
+                    {''.join(grid_lines)}
+
+                    <text x="72" y="45" class="section-label">Sources</text>
+                    <text x="{width / 2 - 68}" y="45" class="section-label">Heat exchange paths</text>
+                    <text x="{width - 122}" y="45" class="section-label">Sinks</text>
+
+                    <rect x="{width / 2 - 95}" y="70" width="190" height="{height - 130}"
+                          rx="28" fill="{lane_fill}" stroke="#e3ebf3" stroke-width="1.2"/>
+
+                    <text x="{width / 2}" y="98" text-anchor="middle" class="lane-label">Exchanger routing zone</text>
+
+                    {''.join(glow_parts)}
+                    {''.join(connector_parts)}
+                    {''.join(badge_parts)}
+                    {''.join(source_cards)}
+                    {''.join(sink_cards)}
+                </svg>
+            </div>
+        </div>
     </body>
     </html>
     """
 
-    components.html(html, height=700, scrolling=False)
+    components.html(html, height=780, scrolling=False)
 
 
 def reset_invalid_choice(widget_key, valid_options):
