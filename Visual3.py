@@ -523,9 +523,8 @@ st.markdown(
 <div class="berkeley-hero">
   <h1>Heat Exchanger Tools</h1>
   <p>
-    Two tools in one Streamlit app: a single shell-and-tube heat-exchanger design/cost calculator
-    and a compact heat-integration matching optimizer, wrapped in a visual style inspired by
-    Berkeley Lab’s dark-blue/teal brand palette.
+    Two tools for understanding heat integration: a single shell-and-tube heat-exchanger design/cost calculator
+    and a compact heat-integration matching optimizer.
   </p>
 </div>
 """,
