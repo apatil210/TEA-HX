@@ -102,7 +102,7 @@ if run_button:
     if len(st.session_state.streams) == 0:
         st.error("Please add at least one hot and one cold stream.")
     else:
-        # Build pinch analyzer with half ΔTmin shift (standard composite-curve method).[web:11]
+        # Build pinch analyzer with half ΔTmin shift (standard composite-curve method).
         temp_shift = dt_min / 2.0
         analyzer = PinchAnalyzer(temp_shift)
 
@@ -118,11 +118,11 @@ if run_button:
             Q = Cp * abs(Ts - Tt)  # kW
 
             if s["type"].startswith("Hot"):
-                # Hot stream releases heat → positive Q in pina.[web:3]
+                # Hot stream releases heat → positive Q in pina.
                 pina_stream = make_stream(Q, Ts, Tt)
                 hot_present = True
             else:
-                # Cold stream needs heat → negative Q in pina.[web:3]
+                # Cold stream needs heat → negative Q in pina.
                 pina_stream = make_stream(-Q, Ts, Tt)
                 cold_present = True
 
@@ -131,7 +131,7 @@ if run_button:
         if not (hot_present and cold_present):
             st.error("You must define at least one hot and one cold stream.")
         else:
-            # Get composite curves and targets from pina.[web:3]
+            # Get composite curves and targets from pina.
             hot_curve = np.array(analyzer.shifted_hot_composite_curve)
             cold_curve = np.array(analyzer.shifted_cold_composite_curve)
 
@@ -143,7 +143,7 @@ if run_button:
             pinch_temps = analyzer.pinch_temps
 
             # ------------------------------------------------------------
-            # Plotting – similar to standard pinch composite curves.[web:43]
+            # Plotting – similar to standard pinch composite curves.
             # ------------------------------------------------------------
             fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -167,7 +167,7 @@ if run_button:
             ax.set_ylabel("Shifted temperature (°C)")
             ax.grid(True, alpha=0.3)
 
-            # Heat-exchanger overlap region (where both curves exist).[web:40]
+            # Heat-exchanger overlap region (where both curves exist).
             hx_start = max(hot_curve[:, 0].min(), cold_curve[:, 0].min())
             hx_end = min(hot_curve[:, 0].max(), cold_curve[:, 0].max())
 
@@ -180,7 +180,7 @@ if run_button:
                     label="Heat exchanger overlap",
                 )
 
-            # Vertical guides for utility regions (conceptual).[web:43]
+            # Vertical guides for utility regions (conceptual).
             ax.axvline(
                 hot_curve[:, 0].min(),
                 color="cyan",
@@ -196,7 +196,7 @@ if run_button:
                 label="Hot utility region",
             )
 
-            # Pinch temperature(s) as horizontal lines.[web:11]
+            # Pinch temperature(s) as horizontal lines.
             for i, Tpinch in enumerate(pinch_temps):
                 ax.axhline(
                     Tpinch,
